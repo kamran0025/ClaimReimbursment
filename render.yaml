@@ -1,0 +1,68 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec) — provisions
+# the backend + a managed Postgres database together, wired to each other
+# automatically. In the Render dashboard: New -> Blueprint -> select this repo.
+#
+# Because both services run inside Render's private network, the backend
+# talks to the database over its *internal* hostname — the
+# external-hostname/SSL/reachability issues you can hit connecting to a
+# Render Postgres instance from your own machine don't apply here.
+#
+# After the first deploy, seed it once (from Render's shell, or your own
+# machine using the database's *external* connection string):
+#   npx tsx prisma/seed.ts
+
+services:
+  - type: web
+    name: expense-claims-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: expense-claims-db
+          property: connectionString
+      - key: PORT
+        value: '4000'
+      - key: NODE_ENV
+        value: production
+      # Update this once the frontend is deployed somewhere — see the note
+      # below about cross-origin cookies if frontend and backend end up on
+      # different *.onrender.com subdomains.
+      - key: CORS_ORIGIN
+        value: http://localhost:5173
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN_SECONDS
+        value: '86400'
+      - key: BCRYPT_SALT_ROUNDS
+        value: '10'
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: MAX_RECEIPT_SIZE_BYTES
+        value: '5242880'
+      # Render terminates TLS at the edge, so the auth cookie can (and
+      # should) require HTTPS in this environment.
+      - key: COOKIE_SECURE
+        value: 'true'
+
+databases:
+  - name: expense-claims-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: '16'
+
+# Free-plan caveats worth knowing:
+# - The free Postgres database expires after 30 days unless upgraded.
+# - The free web service plan has no persistent disk, so files under
+#   UPLOAD_DIR (uploaded receipts) do NOT survive a redeploy. Add a `disk:`
+#   block under the service (requires a paid plan) if that matters.
+# - If the frontend is deployed to a *different* onrender.com subdomain,
+#   the auth cookie is a cross-site cookie from the browser's point of
+#   view — `sameSite: 'lax'` (backend/src/lib/cookies.ts) will block it on
+#   fetch/XHR. That needs `sameSite: 'none'` (still with `secure: true`)
+#   to work cross-origin; not changed here since it's a behavior change
+#   that also affects local dev, and wasn't asked for yet.

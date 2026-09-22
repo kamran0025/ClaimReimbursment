@@ -1,0 +1,173 @@
+// Expense Claims & Reimbursement Management System — backend schema (v2).
+// See plan-backend.md §4. Reimbursement tracking (REIMBURSEMENT_PENDING/
+// REIMBURSED, the `/reimbursements` resource) was dropped from scope — the
+// frontend this backend serves never implements it and APPROVED is its
+// terminal claim status; see task-backend.md decision log.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  FINANCE
+  APPROVER
+  CLAIMANT
+}
+
+enum ClaimStatus {
+  DRAFT
+  PENDING_APPROVAL
+  INFO_REQUESTED
+  REJECTED
+  APPROVED
+  CANCELLED
+}
+
+enum ClaimMessageType {
+  INFO_REQUEST
+  RESPONSE
+}
+
+enum AuditAction {
+  CLAIM_CREATED
+  CLAIM_UPDATED
+  ITEM_ADDED
+  ITEM_UPDATED
+  ITEM_DELETED
+  RECEIPT_UPLOADED
+  RECEIPT_DELETED
+  CLAIM_SUBMITTED
+  CLAIM_RESUBMITTED
+  CLAIM_CANCELLED
+  CLAIM_INFO_REQUESTED
+  CLAIM_INFO_RESPONDED
+  CLAIM_APPROVED
+  CLAIM_REJECTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  claimsFiled      Claim[]        @relation("ClaimClaimant")
+  claimsAssigned   Claim[]        @relation("ClaimAssignedApprover")
+  claimsDecided    Claim[]        @relation("ClaimDecidedBy")
+  claimsRejected   Claim[]        @relation("ClaimRejectedBy")
+  receiptsUploaded Receipt[]      @relation("ReceiptUploadedBy")
+  messagesSent     ClaimMessage[] @relation("ClaimMessageSender")
+  auditLogsActed   AuditLog[]     @relation("AuditLogActor")
+
+  @@index([role])
+}
+
+model Claim {
+  id                 String      @id @default(cuid())
+  claimantId         String
+  title              String
+  status             ClaimStatus @default(DRAFT)
+  total              Decimal     @default(0) @db.Decimal(10, 2)
+  assignedApproverId String?
+  decidedById        String?
+  decidedAt          DateTime?
+  rejectionReason    String?
+  rejectedById       String?
+  rejectedAt         DateTime?
+  submittedAt        DateTime?
+  submissionCycle    Int         @default(1)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  claimant         User           @relation("ClaimClaimant", fields: [claimantId], references: [id])
+  assignedApprover User?          @relation("ClaimAssignedApprover", fields: [assignedApproverId], references: [id])
+  decidedBy        User?          @relation("ClaimDecidedBy", fields: [decidedById], references: [id])
+  rejectedBy       User?          @relation("ClaimRejectedBy", fields: [rejectedById], references: [id])
+  items            ClaimItem[]
+  receipts         Receipt[]
+  messages         ClaimMessage[]
+  auditLogs        AuditLog[]
+
+  @@index([claimantId])
+  @@index([status])
+  @@index([assignedApproverId])
+  @@index([createdAt])
+}
+
+model ClaimItem {
+  id          String   @id @default(cuid())
+  claimId     String
+  expenseDate DateTime
+  category    String
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  merchant    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  claim    Claim     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  receipts Receipt[]
+
+  @@index([claimId])
+}
+
+model Receipt {
+  id           String   @id @default(cuid())
+  claimId      String
+  claimItemId  String?
+  fileName     String
+  mimeType     String
+  fileSize     Int
+  storagePath  String
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  claim      Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  claimItem  ClaimItem?     @relation(fields: [claimItemId], references: [id], onDelete: SetNull)
+  uploadedBy User           @relation("ReceiptUploadedBy", fields: [uploadedById], references: [id])
+  messages   ClaimMessage[] @relation("ClaimMessageAttachedReceipt")
+
+  @@index([claimId])
+  @@index([claimItemId])
+}
+
+model ClaimMessage {
+  id                String           @id @default(cuid())
+  claimId           String
+  senderId          String
+  type              ClaimMessageType
+  message           String
+  attachedReceiptId String?
+  createdAt         DateTime         @default(now())
+
+  claim           Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sender          User     @relation("ClaimMessageSender", fields: [senderId], references: [id])
+  attachedReceipt Receipt? @relation("ClaimMessageAttachedReceipt", fields: [attachedReceiptId], references: [id], onDelete: SetNull)
+
+  @@index([claimId])
+}
+
+model AuditLog {
+  id        String       @id @default(cuid())
+  claimId   String
+  actorId   String?
+  action    AuditAction
+  oldStatus ClaimStatus?
+  newStatus ClaimStatus?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  actor User? @relation("AuditLogActor", fields: [actorId], references: [id])
+
+  @@index([claimId])
+}
