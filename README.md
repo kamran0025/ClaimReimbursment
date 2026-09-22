@@ -75,12 +75,11 @@ don't apply service-to-service.
 # DATABASE_URL automatically, and generates JWT_SECRET.
 ```
 
-After the first deploy, run the seed script once from Render's shell (or
-your own machine using the **external** connection string it gives you):
-
-```bash
-npx tsx prisma/seed.ts
-```
+No manual seeding step needed — the container's startup command runs
+migrations then the seed script on every boot (`backend/Dockerfile`'s
+`CMD`), and the seed script no-ops itself once the database has any users,
+so it only actually seeds on that first boot. This also means the Shell
+tab (a paid-plan feature on Render) is never required.
 
 Set `CORS_ORIGIN` in the Render dashboard to wherever the frontend ends up
 being served from (it defaults to `http://localhost:5173` in `render.yaml`

@@ -35,6 +35,21 @@ Frontend work is tracked separately in `task-frontend.md`.
   Render together via `render.yaml` keeps them on the same private
   network, avoiding the external-hostname connection path (and its
   SSL/reachability quirks) entirely.
+- **Seeding made automatic and self-guarding.** `prisma/seed.ts` now bails
+  out immediately if the database already has any users, instead of
+  always wiping+recreating claim data. This makes it safe to run
+  unconditionally on every container boot (`backend/Dockerfile`'s `CMD`
+  now runs `prisma migrate deploy && tsx prisma/seed.ts && node
+  dist/server.js`) rather than needing a manual one-time step — important
+  because Render's Shell tab, the obvious place to run a one-off command,
+  is a paid-plan feature. Also moved `prisma` and `tsx` from
+  devDependencies to dependencies in `package.json`, since the production
+  Docker stage only installs non-dev deps and both are now needed at
+  runtime (`prisma` was already being invoked in the container's `CMD`
+  before this change too — that was a latent bug, now fixed alongside
+  this). Verified end-to-end against a real Postgres: seeded a fresh DB,
+  inserted a claim simulating real usage, re-ran the seed script, and
+  confirmed it skipped and the real claim survived.
 
 ## 0. Planning
 - [x] Inspect repo (empty — greenfield POC)

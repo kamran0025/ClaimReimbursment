@@ -83,9 +83,14 @@ CI/production to apply pending migrations without prompting.
 emails, names) as the frontend's mock `services/api/db.ts`, all with
 password `password123`, so logging in against the real backend and against
 the mock look identical. Seeds one claim in every `ClaimStatus`, including
-`INFO_REQUESTED` and a resubmitted (`submissionCycle: 2`) example. Wipes and
-recreates all claim data on every run (users are upserted, never deleted),
-so it's safe to re-run against an already-seeded database:
+`INFO_REQUESTED` and a resubmitted (`submissionCycle: 2`) example.
+
+Guarded to run at most once: it checks `User` count first and does nothing
+if the database already has any users (whether from a prior seed run, or
+real usage). This makes it safe to invoke unconditionally on every
+container boot — see `backend/Dockerfile`'s `CMD` — without risk of
+wiping real data on a redeploy. Manual invocation still works the same way
+against a genuinely empty database:
 
 ```bash
 npm run prisma:seed

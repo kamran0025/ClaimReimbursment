@@ -7,9 +7,11 @@
 # external-hostname/SSL/reachability issues you can hit connecting to a
 # Render Postgres instance from your own machine don't apply here.
 #
-# After the first deploy, seed it once (from Render's shell, or your own
-# machine using the database's *external* connection string):
-#   npx tsx prisma/seed.ts
+# No manual seeding step needed: backend/Dockerfile's CMD runs migrations
+# then the seed script on every boot, and the seed script no-ops itself
+# once the database already has any users — so it only actually seeds on
+# the first boot. Also means the Shell tab (a paid-plan feature) is never
+# required to get demo data in.
 
 services:
   - type: web

@@ -1,8 +1,13 @@
 // Seeds the same demo identities the frontend's mock `services/api/db.ts`
 // already uses (task-backend.md §2) — same emails, same password
 // ("password123") — so both sides demo consistently once the frontend is
-// swapped from mock to real. Idempotent: safe to re-run against a fresh or
-// already-seeded dev database (upserts users, wipes+recreates claim data).
+// swapped from mock to real.
+//
+// Safe to wire into container startup (see Dockerfile's CMD) and run on
+// every boot: it bails out immediately if the database already has any
+// users. Only a genuinely empty/fresh database gets seeded — this must
+// NEVER wipe+recreate claim data on a deploy where real usage has
+// happened, only on true first boot.
 import { PrismaClient, Role, ClaimStatus, ClaimMessageType, AuditAction } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -18,6 +23,13 @@ function daysAgo(n: number, hour = 10, minute = 0): Date {
 }
 
 async function main() {
+  const existingUserCount = await prisma.user.count();
+  if (existingUserCount > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`Seed skipped: ${existingUserCount} user(s) already exist (already seeded, or real data present).`);
+    return;
+  }
+
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const seedUsers = [
@@ -38,7 +50,8 @@ async function main() {
     });
   }
 
-  // Wipe claim data only (users are upserted, never deleted) so this script is re-runnable.
+  // The guard above means we only ever reach this on a fresh database, but
+  // delete-before-create keeps this safe if it's ever invoked manually too.
   await prisma.auditLog.deleteMany();
   await prisma.claimMessage.deleteMany();
   await prisma.receipt.deleteMany();

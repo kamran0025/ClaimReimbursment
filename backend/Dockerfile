@@ -19,4 +19,8 @@ COPY prisma ./prisma
 COPY --from=base /app/dist ./dist
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Migrate, then seed (a no-op once the database has any users — see
+# prisma/seed.ts — so this is safe to run on every boot, not just the
+# first), then start the server. Keeps first-deploy setup to zero manual
+# steps — no Shell tab (a paid-plan feature on Render) required.
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts && node dist/server.js"]
