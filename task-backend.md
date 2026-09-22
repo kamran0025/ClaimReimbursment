@@ -50,6 +50,22 @@ Frontend work is tracked separately in `task-frontend.md`.
   this). Verified end-to-end against a real Postgres: seeded a fresh DB,
   inserted a claim simulating real usage, re-ran the seed script, and
   confirmed it skipped and the real claim survived.
+- **Cross-site auth cookie bug found and fixed.** Deployed against the
+  Render backend with a local frontend (`localhost:5173` calling
+  `*.onrender.com` — genuinely cross-site, different registrable domains),
+  login succeeded but every subsequent request came back
+  `UNAUTHENTICATED`. Root cause: the auth cookie was always issued with
+  `SameSite=Lax`, which a browser stores fine on the login response but
+  then withholds from any later cross-site `fetch`/XHR — indistinguishable
+  from a broken session from the outside. `backend/src/lib/cookies.ts` now
+  derives `sameSite`/`secure` from `COOKIE_SECURE`: `None`+`Secure` when
+  true (any real HTTPS deployment), `Lax`+non-secure when false (local
+  HTTP dev, where `None` would be rejected by the browser outright since
+  it requires `Secure`, and plain `Lax` already works because same-port
+  differences on `localhost` are same-site). Verified by inspecting the
+  actual `Set-Cookie` response header in both modes against a real running
+  server — confirmed `Secure; SameSite=None` vs. plain `SameSite=Lax`
+  exactly as intended.
 
 ## 0. Planning
 - [x] Inspect repo (empty — greenfield POC)

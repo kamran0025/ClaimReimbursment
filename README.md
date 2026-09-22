@@ -84,7 +84,12 @@ tab (a paid-plan feature on Render) is never required.
 Set `CORS_ORIGIN` in the Render dashboard to wherever the frontend ends up
 being served from (it defaults to `http://localhost:5173` in `render.yaml`
 — fine for local frontend + deployed backend, not for a deployed frontend).
-Note the free Postgres plan and free web service plan both have real
+The auth cookie itself is already set up for this cross-origin case —
+`COOKIE_SECURE=true` (set in `render.yaml`) makes it `SameSite=None;
+Secure`, which is what a browser requires to actually send the cookie back
+on a cross-site request; without that it gets stored fine at login but
+silently withheld from every request after, which looks exactly like a
+broken session. Note the free Postgres plan and free web service plan both have real
 limits (the DB expires after 30 days unless upgraded; the disk for
 uploaded receipts isn't available on the free web service plan, so
 uploads won't survive a redeploy) — fine for demoing, not for anything
