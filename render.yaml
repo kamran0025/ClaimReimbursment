@@ -31,9 +31,7 @@ services:
         value: '4000'
       - key: NODE_ENV
         value: production
-      # Update this once the frontend is deployed somewhere — see the note
-      # below about cross-origin cookies if frontend and backend end up on
-      # different *.onrender.com subdomains.
+      # Update this once the frontend is deployed somewhere.
       - key: CORS_ORIGIN
         value: http://localhost:5173
       - key: JWT_SECRET
@@ -62,9 +60,13 @@ databases:
 # - The free web service plan has no persistent disk, so files under
 #   UPLOAD_DIR (uploaded receipts) do NOT survive a redeploy. Add a `disk:`
 #   block under the service (requires a paid plan) if that matters.
-# - If the frontend is deployed to a *different* onrender.com subdomain,
-#   the auth cookie is a cross-site cookie from the browser's point of
-#   view — `sameSite: 'lax'` (backend/src/lib/cookies.ts) will block it on
-#   fetch/XHR. That needs `sameSite: 'none'` (still with `secure: true`)
-#   to work cross-origin; not changed here since it's a behavior change
-#   that also affects local dev, and wasn't asked for yet.
+#
+# Cross-site cookies (frontend and backend on different domains/subdomains,
+# e.g. a local frontend calling this deployed backend, or the frontend
+# deployed to its own onrender.com subdomain later) are handled:
+# `COOKIE_SECURE=true` here makes `backend/src/lib/cookies.ts` issue the
+# auth cookie with `SameSite=None; Secure`, which is what's required for
+# the browser to actually send it back on a cross-site `fetch`/XHR — a
+# same-site-only `SameSite=Lax` cookie (the local-dev default) gets stored
+# fine but is silently withheld from those requests, which looks exactly
+# like a broken/expired session (verified: reproduced and fixed).
