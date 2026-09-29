@@ -31,7 +31,10 @@ services:
         value: '4000'
       - key: NODE_ENV
         value: production
-      # Update this once the frontend is deployed somewhere.
+      # Comma-separated — add the deployed frontend's URL alongside
+      # localhost:5173 once it exists, e.g.
+      # "http://localhost:5173,https://your-frontend.onrender.com" — see
+      # backend/.env.example and backend/src/lib/env.ts.
       - key: CORS_ORIGIN
         value: http://localhost:5173
       - key: JWT_SECRET

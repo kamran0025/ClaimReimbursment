@@ -66,6 +66,21 @@ Frontend work is tracked separately in `task-frontend.md`.
   actual `Set-Cookie` response header in both modes against a real running
   server — confirmed `Secure; SameSite=None` vs. plain `SameSite=Lax`
   exactly as intended.
+- **`CORS_ORIGIN` now accepts a comma-separated allowlist**, not just one
+  origin — to support running the backend against two frontends at once
+  (a local dev frontend and a deployed one, say). Deliberately not a true
+  wildcard: `Access-Control-Allow-Origin: *` is spec-forbidden alongside
+  `Access-Control-Allow-Credentials: true`, which our cookie auth requires,
+  and opening CORS to literally any origin would also remove the one
+  remaining CSRF defense now that the auth cookie is `SameSite=None` in
+  production (see the entry above) — the origin allowlist is that defense.
+  `app.ts`'s `cors()` config now reflects the request's `Origin` back only
+  if it's in `env.corsOrigins` (`lib/env.ts` parses `CORS_ORIGIN` into that
+  list); no `Origin` header at all (curl, server-to-server) is let through
+  unchanged. Verified against a real running server: two configured
+  origins both got a matching `Access-Control-Allow-Origin` +
+  `Access-Control-Allow-Credentials: true`, an unlisted origin got neither
+  header, and a plain no-`Origin` request passed through.
 
 ## 0. Planning
 - [x] Inspect repo (empty — greenfield POC)

@@ -84,6 +84,10 @@ tab (a paid-plan feature on Render) is never required.
 Set `CORS_ORIGIN` in the Render dashboard to wherever the frontend ends up
 being served from (it defaults to `http://localhost:5173` in `render.yaml`
 — fine for local frontend + deployed backend, not for a deployed frontend).
+It's comma-separated, so you can keep `http://localhost:5173` *and* add a
+deployed frontend URL at the same time if you want both to keep working —
+this isn't a wildcard, each request's `Origin` is checked against the
+exact list (see `backend/src/lib/env.ts`).
 The auth cookie itself is already set up for this cross-origin case —
 `COOKIE_SECURE=true` (set in `render.yaml`) makes it `SameSite=None;
 Secure`, which is what a browser requires to actually send the cookie back

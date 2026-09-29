@@ -13,7 +13,9 @@ CREATE TYPE "ClaimMessageType" AS ENUM ('INFO_REQUEST', 'RESPONSE');
 -- CreateEnum
 CREATE TYPE "AuditAction" AS ENUM ('CLAIM_CREATED', 'CLAIM_UPDATED', 'ITEM_ADDED', 'ITEM_UPDATED', 'ITEM_DELETED', 'RECEIPT_UPLOADED', 'RECEIPT_DELETED', 'CLAIM_SUBMITTED', 'CLAIM_RESUBMITTED', 'CLAIM_CANCELLED', 'CLAIM_INFO_REQUESTED', 'CLAIM_INFO_RESPONDED', 'CLAIM_APPROVED', 'CLAIM_REJECTED');
 
--- CreateTable
+-- CreateTables.json());s.json());
+
+
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -30,7 +32,7 @@ CREATE TABLE "User" (
 -- CreateTable
 CREATE TABLE "Claim" (
     "id" TEXT NOT NULL,
-    "claimantId" TEXT NOT NULL,
+    "claimantId" TEXT NOT ClaimItemNULL,
     "title" TEXT NOT NULL,
     "status" "ClaimStatus" NOT NULL DEFAULT 'DRAFT',
     "total" DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -47,6 +49,7 @@ CREATE TABLE "Claim" (
 
     CONSTRAINT "Claim_pkey" PRIMARY KEY ("id")
 );
+s.json());
 
 -- CreateTable
 CREATE TABLE "ClaimItem" (
@@ -62,6 +65,7 @@ CREATE TABLE "ClaimItem" (
 
     CONSTRAINT "ClaimItem_pkey" PRIMARY KEY ("id")
 );
+s.json());
 
 -- CreateTable
 CREATE TABLE "Receipt" (
