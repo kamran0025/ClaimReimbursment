@@ -9,10 +9,12 @@ import { auditRouter } from './routes/audit';
 import { financeRouter } from './routes/finance';
 import { dashboardsRouter } from './routes/dashboards';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { requestLogger } from './middleware/requestLogger';
 
 export function createApp() {
   const app = express();
 
+  app.use(requestLogger);
   app.use(
     cors({
       // Reflects the request's Origin back only if it's in the CORS_ORIGIN

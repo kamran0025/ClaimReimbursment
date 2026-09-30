@@ -4,6 +4,7 @@ import multer from 'multer';
 import { ZodError } from 'zod';
 import { ApiError, ErrorCode } from '../services/errors';
 import type { ApiErrorBody } from '../types/api';
+import { logger } from '../lib/logger';
 
 export function notFoundHandler(req: Request, res: Response): void {
   const body: ApiErrorBody = { success: false, error: { code: ErrorCode.NOT_FOUND, message: `No route: ${req.method} ${req.path}` } };
@@ -11,8 +12,9 @@ export function notFoundHandler(req: Request, res: Response): void {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof ApiError) {
+    res.locals.errorCode = err.code;
     const body: ApiErrorBody = { success: false, error: { code: err.code, message: err.message, details: err.details } };
     res.status(err.status).json(body);
     return;
@@ -37,8 +39,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
-  // eslint-disable-next-line no-console
-  console.error(err);
+  logger.error(`${req.method} ${req.originalUrl.split('?')[0]} - ${err instanceof Error ? err.message : String(err)}`);
   const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
   const body: ApiErrorBody = { success: false, error: { code: ErrorCode.INTERNAL_ERROR, message } };
   res.status(500).json(body);

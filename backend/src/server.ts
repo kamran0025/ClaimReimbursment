@@ -1,9 +1,9 @@
 import { createApp } from './app';
 import { env } from './lib/env';
+import { logger } from './lib/logger';
 
 const app = createApp();
 
 app.listen(env.port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`API listening on http://localhost:${env.port}`);
+  logger.info(`API listening on port ${env.port}`);
 });
