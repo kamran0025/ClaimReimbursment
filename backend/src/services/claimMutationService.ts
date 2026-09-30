@@ -27,7 +27,7 @@ import type { CreateClaimInput, UpdateClaimInput, ClaimItemInput, RespondInfoInp
 async function requireClaimForOwner(tx: Prisma.TransactionClient, user: ScopeUser, claimId: string): Promise<Claim> {
   const claim = await tx.claim.findUnique({ where: { id: claimId } });
   if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
-  assertOwner(user, claim);
+  assertOwner(user, claim); // 
   return claim;
 }
 

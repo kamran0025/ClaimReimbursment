@@ -51,6 +51,15 @@ services:
       # should) require HTTPS in this environment.
       - key: COOKIE_SECURE
         value: 'true'
+      # Receipt storage — the free plan's disk is wiped on every restart,
+      # so receipts go to Cloudinary. `sync: false` = enter the values in
+      # the Render dashboard (Environment tab); they're never committed.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
 databases:
   - name: expense-claims-db
@@ -61,8 +70,9 @@ databases:
 # Free-plan caveats worth knowing:
 # - The free Postgres database expires after 30 days unless upgraded.
 # - The free web service plan has no persistent disk, so files under
-#   UPLOAD_DIR (uploaded receipts) do NOT survive a redeploy. Add a `disk:`
-#   block under the service (requires a paid plan) if that matters.
+#   UPLOAD_DIR do NOT survive a restart/redeploy — which is why receipts
+#   are stored in Cloudinary here (CLOUDINARY_* vars above). Without those
+#   set, the backend falls back to UPLOAD_DIR and receipts will vanish.
 #
 # Cross-site cookies (frontend and backend on different domains/subdomains,
 # e.g. a local frontend calling this deployed backend, or the frontend
