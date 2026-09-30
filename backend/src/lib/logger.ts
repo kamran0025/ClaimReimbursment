@@ -3,10 +3,10 @@
 // Silent under tests (vitest sets NODE_ENV=test) to keep test output clean.
 type Level = 'INFO' | 'WARN' | 'ERROR';
 
-const silent = process.env.NODE_ENV === 'test';
+// const silent = process.env.NODE_ENV === 'test';
 
 function write(level: Level, message: string): void {
-  if (silent) return;
+  // if (silent) return;
   const time = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const line = `${time} ${level.padEnd(5)} ${message}`;
   // eslint-disable-next-line no-console
