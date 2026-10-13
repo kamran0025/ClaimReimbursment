@@ -12,6 +12,7 @@ import { recordAudit } from './auditLogService';
 import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
 import { isAllowedReceiptMimeType } from './receiptRules';
 import { storage } from './storage';
+import { logger } from '../lib/logger';
 
 export interface UploadedFile {
   originalname: string;
@@ -53,28 +54,37 @@ export async function addReceipt(user: ScopeUser, claimId: string, file: Uploade
     if (!item) throw new ApiError(ErrorCode.ITEM_NOT_FOUND, 'Line item not found.');
   }
 
+  // The file is stored before its DB row exists; if the row can't be written,
+  // remove the file again so it isn't left orphaned in storage.
   const stored = await storage.save(file.buffer, file.originalname);
-  await prisma.$transaction(async (tx) => {
-    const receipt = await tx.receipt.create({
-      data: {
+  try {
+    await prisma.$transaction(async (tx) => {
+      const receipt = await tx.receipt.create({
+        data: {
+          claimId,
+          claimItemId,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          storagePath: stored.storagePath,
+          uploadedById: user.id,
+        },
+      });
+      await recordAudit(tx, {
         claimId,
-        claimItemId,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        storagePath: stored.storagePath,
-        uploadedById: user.id,
-      },
+        actorId: user.id,
+        action: 'RECEIPT_UPLOADED',
+        oldStatus: claim.status,
+        newStatus: claim.status,
+        metadata: { fileName: receipt.fileName, claimItemId },
+      });
     });
-    await recordAudit(tx, {
-      claimId,
-      actorId: user.id,
-      action: 'RECEIPT_UPLOADED',
-      oldStatus: claim.status,
-      newStatus: claim.status,
-      metadata: { fileName: receipt.fileName, claimItemId },
+  } catch (err) {
+    await storage.delete(stored.storagePath).catch((cleanupErr: unknown) => {
+      logger.error(`Orphaned receipt file ${stored.storagePath} - ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`);
     });
-  });
+    throw err;
+  }
 
   return buildClaimDetail(await loadClaimForMutation(claimId));
 }
