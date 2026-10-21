@@ -10,6 +10,7 @@ const claimRelationsInclude = {
   claimant: true,
   assignedApprover: true,
   decidedBy: true,
+  approverApprovedBy: true,
 } satisfies Prisma.ClaimInclude;
 
 export interface ClaimFilters {

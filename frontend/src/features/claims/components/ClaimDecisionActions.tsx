@@ -6,16 +6,17 @@ import { DecisionMessageModal } from './DecisionMessageModal';
 import { useApproveClaim, useRejectClaim } from '@/features/claims/hooks/useClaimDecisions';
 import { useAuth } from '@/app/AuthContext';
 import { useToast } from '@/app/ToastContext';
-import { Role } from '@/types/enums';
-import { isInReview } from '@/services/api/stateMachine';
+import { ClaimStatus, Role } from '@/types/enums';
+import { canDecideClaim, isAtFinanceStage } from '@/services/api/stateMachine';
 import { formatInr } from '@/utils/format';
 
 /**
  * The two direct decision actions — Approve / Reject — usable by the
  * claim's `assignedApproverId`, or by any Finance user, while the claim is
- * still in review (`PENDING_APPROVAL` or `INFO_REQUESTED` — plan-backend.md
- * §6, extended so a decision-maker isn't blocked from deciding just because
- * a conversation is in progress). Requesting more information is handled
+ * still in review (plan-backend.md §6, extended so a decision-maker isn't
+ * blocked from deciding just because a conversation is in progress). For a
+ * claim above the Finance-approval threshold the approver's Approve
+ * escalates it to Finance, and from then on only Finance sees these actions. Requesting more information is handled
  * inline in the Messages panel (`ClaimMessagesPanel`) instead, since it's
  * just the next chat message rather than a one-off decision. Renders
  * nothing when the current user may not decide this claim right now, so
@@ -30,8 +31,9 @@ export function ClaimDecisionActions({ claim, onDecided }: { claim: ClaimDetail;
   const [showReject, setShowReject] = useState(false);
 
   if (!user) return null;
-  const canDecide = isInReview(claim.status) && (user.role === Role.FINANCE || claim.assignedApproverId === user.id);
-  if (!canDecide) return null;
+  if (!canDecideClaim(claim, user)) return null;
+  // The approver's sign-off on a high-value claim escalates it instead of closing it.
+  const willEscalate = user.role !== Role.FINANCE && claim.requiresFinanceApproval && !isAtFinanceStage(claim);
 
   return (
     <>
@@ -43,13 +45,17 @@ export function ClaimDecisionActions({ claim, onDecided }: { claim: ClaimDetail;
       <ConfirmDialog
         isOpen={confirmApprove}
         title="Approve claim"
-        message={`Approve "${claim.title}" for ${formatInr(claim.total)}?`}
+        message={
+          willEscalate
+            ? `Approve "${claim.title}" for ${formatInr(claim.total)}? Claims of this amount also need Finance approval, so it will be sent to Finance for the final decision.`
+            : `Approve "${claim.title}" for ${formatInr(claim.total)}?`
+        }
         confirmLabel="Approve"
         isLoading={approveClaim.isPending}
         onConfirm={async () => {
           try {
-            await approveClaim.mutateAsync();
-            toast.success('Claim approved');
+            const updated = await approveClaim.mutateAsync();
+            toast.success(updated.status === ClaimStatus.PENDING_FINANCE_APPROVAL ? 'Approved — sent to Finance for final approval' : 'Claim approved');
             onDecided?.();
           } catch (err) {
             toast.error('Could not approve claim', err instanceof Error ? err.message : undefined);

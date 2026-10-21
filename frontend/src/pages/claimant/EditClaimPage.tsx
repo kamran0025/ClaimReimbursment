@@ -7,12 +7,11 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { ClaimStatusBadge } from '@/components/common/StatusBadge';
 import { useToast } from '@/app/ToastContext';
-import { useClaim, useActiveApprovers } from '@/features/claims/hooks/useClaims';
+import { useClaim } from '@/features/claims/hooks/useClaims';
 import {
   useAddItem,
   useUpdateItem,
@@ -36,15 +35,12 @@ export function EditClaimPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const { data: claim, isLoading, isError, error, refetch } = useClaim(claimId);
-  const { data: approvers } = useActiveApprovers();
 
   const [itemModal, setItemModal] = useState<{ open: boolean; item: ClaimItem | null }>({ open: false, item: null });
   const [deleteTarget, setDeleteTarget] = useState<ClaimItem | null>(null);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
-  const [selectedApproverId, setSelectedApproverId] = useState<string>('');
-  const [approverTouched, setApproverTouched] = useState(false);
 
   const addItem = useAddItem(claimId ?? '');
   const updateItem = useUpdateItem(claimId ?? '');
@@ -70,7 +66,6 @@ export function EditClaimPage() {
 
   const editable = isEditableStatus(claim.status);
   const isResubmit = claim.status === 'REJECTED';
-  const effectiveApproverId = selectedApproverId || claim.assignedApproverId || '';
 
   const onSaveTitle = async (values: ClaimTitleFormValues) => {
     try {
@@ -142,18 +137,13 @@ export function EditClaimPage() {
   };
 
   const doSubmit = async () => {
-    if (!effectiveApproverId) {
-      setApproverTouched(true);
-      setConfirmSubmit(false);
-      return;
-    }
     try {
       if (isResubmit) {
-        await resubmitClaim.mutateAsync(effectiveApproverId);
+        await resubmitClaim.mutateAsync();
         toast.success('Claim resubmitted', 'It is back with the assigned approver.');
       } else {
-        await submitClaim.mutateAsync(effectiveApproverId);
-        toast.success('Claim submitted', 'It is now awaiting approval.');
+        await submitClaim.mutateAsync();
+        toast.success('Claim submitted', 'It has been assigned to an approver for review.');
       }
       setConfirmSubmit(false);
       navigate(`/claimant/claims/${claim.id}`);
@@ -244,30 +234,6 @@ export function EditClaimPage() {
       </Card>
 
       {editable && (
-        <Card className="mb-4">
-          <CardHeader title="Assign approver" subtitle="Required to submit — not required while saving as a draft." />
-          <CardBody>
-            <Select
-              label="Approver"
-              placeholder="Select an approver"
-              value={effectiveApproverId}
-              onChange={(e) => {
-                setSelectedApproverId(e.target.value);
-                setApproverTouched(true);
-              }}
-              error={approverTouched && !effectiveApproverId ? 'Select an approver before submitting.' : undefined}
-            >
-              {approvers?.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({a.email})
-                </option>
-              ))}
-            </Select>
-          </CardBody>
-        </Card>
-      )}
-
-      {editable && (
         <div className="flex flex-wrap justify-end gap-2">
           {claim.status === 'DRAFT' && (
             <Button variant="outline" className="text-red-600" onClick={() => setConfirmCancel(true)}>
@@ -275,10 +241,7 @@ export function EditClaimPage() {
             </Button>
           )}
           <Button
-            onClick={() => {
-              setApproverTouched(true);
-              if (effectiveApproverId) setConfirmSubmit(true);
-            }}
+            onClick={() => setConfirmSubmit(true)}
             disabled={claim.items.length === 0}
           >
             {isResubmit ? 'Resubmit for Approval' : 'Submit for Approval'}

@@ -35,6 +35,7 @@ export function ClaimantDashboardPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
             <StatCard label="Draft" value={data.counts.DRAFT} accent="slate" />
             <StatCard label="Pending approval" value={data.counts.PENDING_APPROVAL} accent="amber" />
+            <StatCard label="With Finance" value={data.counts.PENDING_FINANCE_APPROVAL} accent="purple" />
             <StatCard label="Info requested" value={data.counts.INFO_REQUESTED} accent="orange" />
             <StatCard label="Rejected" value={data.counts.REJECTED} accent="red" />
             <StatCard label="Approved" value={data.counts.APPROVED} accent="green" />

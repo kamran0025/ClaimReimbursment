@@ -20,6 +20,8 @@ export interface ApproverDashboard {
   infoRequestedCount: number;
   approvedToday: number;
   rejectedCount: number;
+  /** Claims I approved that are above the threshold and now wait on Finance. */
+  awaitingFinanceCount: number;
   totalPendingAmount: number;
   pendingClaims: Claim[];
 }

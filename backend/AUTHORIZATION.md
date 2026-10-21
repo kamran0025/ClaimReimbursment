@@ -53,7 +53,7 @@ is gated to `CLAIMANT` — see below).
 | Create / edit own DRAFT or REJECTED claim | ✅ own only | ❌ | ❌ |
 | View claim | ✅ own only | ✅ only if `assignedApproverId === self` | ✅ any non-DRAFT |
 | Submit / resubmit (choose approver) | ✅ own only | ❌ | ❌ |
-| Approve / Reject / Request info | ❌ | ✅ only if assigned to self **and** status is `PENDING_APPROVAL`/`INFO_REQUESTED` | ✅ any claim in that state, regardless of assignment |
+| Approve / Reject / Request info | ❌ | ✅ only if assigned to self **and** status is `PENDING_APPROVAL`/`INFO_REQUESTED`, and the claim has not been escalated to Finance (`FINANCE_APPROVAL_REQUIRED` otherwise) | ✅ any claim in review (incl. `PENDING_FINANCE_APPROVAL`), regardless of assignment — the only role that can make the final decision on a claim above `FINANCE_APPROVAL_THRESHOLD` |
 | Respond to an info request | ✅ own claim only | ❌ | ❌ |
 | Upload receipt | ✅ own claim's | ❌ | ❌ |
 | View / download receipt | ✅ own claim's | ✅ assigned claim's | ✅ any non-DRAFT claim's |

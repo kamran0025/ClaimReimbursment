@@ -12,7 +12,6 @@ import {
   createClaimSchema,
   updateClaimSchema,
   claimItemSchema,
-  submitClaimSchema,
   rejectClaimSchema,
   requestInfoSchema,
   respondInfoSchema,
@@ -109,18 +108,16 @@ claimsRouter.patch(
 
 claimsRouter.post(
   '/:id/submit',
-  validateBody(submitClaimSchema),
   asyncHandler(async (req, res) => {
-    const result = await submitClaim(scopeUser(req), req.params.id, req.body.assignedApproverId);
+    const result = await submitClaim(scopeUser(req), req.params.id);
     res.json(ok(result));
   }),
 );
 
 claimsRouter.post(
   '/:id/resubmit',
-  validateBody(submitClaimSchema),
   asyncHandler(async (req, res) => {
-    const result = await resubmitClaim(scopeUser(req), req.params.id, req.body.assignedApproverId);
+    const result = await resubmitClaim(scopeUser(req), req.params.id);
     res.json(ok(result));
   }),
 );

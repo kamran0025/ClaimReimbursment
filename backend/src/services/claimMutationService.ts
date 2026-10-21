@@ -3,12 +3,13 @@
 // plan-backend.md §5-§8. Ported 1:1 from
 // frontend/src/services/api/claimsService.ts's business rules (ownership,
 // state-machine guards, server-side total recalculation, mandatory
-// non-empty submission, approver assignment, mandatory rejection/info
+// non-empty submission, automatic approver assignment, mandatory rejection/info
 // messages) — the mock this backend replaces implemented exactly this logic
 // in memory; here every mutation runs inside a `prisma.$transaction`
 // (plan-backend.md §8) and every status change is paired with an audit row.
 import { ClaimMessageType, ClaimStatus, Prisma, Role, type Claim } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { env } from '../lib/env';
 import { ApiError, ErrorCode } from './errors';
 import { assertOwner, type ScopeUser } from './claimScope';
 import {
@@ -17,9 +18,12 @@ import {
   assertEditable,
   assertRespondable,
   assertSubmittable,
+  isAtFinanceStage,
+  requiresFinanceApproval,
 } from './claimStateMachine';
 import { recalculateClaimTotal } from './claimTotalService';
 import { recordAudit } from './auditLogService';
+import { resolveApprover } from './approverAssignmentService';
 import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
 import { storage } from './storage';
 import type { CreateClaimInput, UpdateClaimInput, ClaimItemInput, RespondInfoInput } from '../validation/claimValidation';
@@ -177,15 +181,10 @@ export async function deleteItem(user: ScopeUser, claimId: string, itemId: strin
   return buildClaimDetail(await loadClaimForMutation(claimId));
 }
 
-async function runSubmission(user: ScopeUser, claimId: string, isResubmit: boolean, assignedApproverId: string) {
+async function runSubmission(user: ScopeUser, claimId: string, isResubmit: boolean) {
   await prisma.$transaction(async (tx) => {
     const claim = await requireClaimForOwner(tx, user, claimId);
     assertSubmittable(claim);
-
-    const approver = await tx.user.findUnique({ where: { id: assignedApproverId } });
-    if (!approver || approver.role !== Role.APPROVER || !approver.isActive) {
-      throw new ApiError(ErrorCode.VALIDATION_ERROR, 'Select a valid, active approver.', { field: 'assignedApproverId' });
-    }
 
     const items = await tx.claimItem.findMany({ where: { claimId } });
     if (items.length === 0) {
@@ -196,6 +195,7 @@ async function runSubmission(user: ScopeUser, claimId: string, isResubmit: boole
     }
 
     const total = await recalculateClaimTotal(tx, claimId);
+    const assignedApproverId = await resolveApprover(tx, claim, isResubmit);
 
     const nextCycle = isResubmit ? claim.submissionCycle + 1 : claim.submissionCycle;
     await tx.claim.update({
@@ -205,6 +205,8 @@ async function runSubmission(user: ScopeUser, claimId: string, isResubmit: boole
         assignedApproverId,
         decidedById: null,
         decidedAt: null,
+        approverApprovedById: null,
+        approverApprovedAt: null,
         submissionCycle: nextCycle,
         submittedAt: new Date(),
         rejectionReason: null,
@@ -225,12 +227,12 @@ async function runSubmission(user: ScopeUser, claimId: string, isResubmit: boole
   return buildClaimDetail(await loadClaimForMutation(claimId));
 }
 
-export function submitClaim(user: ScopeUser, claimId: string, assignedApproverId: string) {
-  return runSubmission(user, claimId, false, assignedApproverId);
+export function submitClaim(user: ScopeUser, claimId: string) {
+  return runSubmission(user, claimId, false);
 }
 
-export function resubmitClaim(user: ScopeUser, claimId: string, assignedApproverId: string) {
-  return runSubmission(user, claimId, true, assignedApproverId);
+export function resubmitClaim(user: ScopeUser, claimId: string) {
+  return runSubmission(user, claimId, true);
 }
 
 export async function cancelClaim(user: ScopeUser, claimId: string) {
@@ -256,12 +258,38 @@ export async function cancelClaim(user: ScopeUser, claimId: string) {
 // reads it, so a concurrent second decision on the same claim simply fails
 // `assertDecidable` against the now-decided status once its transaction reads
 // the row (normal transaction isolation on the row update — plan-backend.md §5).
+//
+// Approval hierarchy: when the assigned approver approves a claim whose total
+// is above env.financeApprovalThreshold, the claim is escalated to
+// PENDING_FINANCE_APPROVAL rather than approved, and only Finance can make the
+// final decision. A Finance approval is always final, at either stage.
 // ---------------------------------------------------------------------------
 export async function approveClaim(user: { id: string; role: Role }, claimId: string) {
   await prisma.$transaction(async (tx) => {
     const claim = await tx.claim.findUnique({ where: { id: claimId } });
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertDecidable(claim, user);
+
+    const escalate =
+      user.role !== Role.FINANCE &&
+      !isAtFinanceStage(claim) &&
+      requiresFinanceApproval(claim.total, env.financeApprovalThreshold);
+
+    if (escalate) {
+      await tx.claim.update({
+        where: { id: claimId },
+        data: { status: ClaimStatus.PENDING_FINANCE_APPROVAL, approverApprovedById: user.id, approverApprovedAt: new Date() },
+      });
+      await recordAudit(tx, {
+        claimId,
+        actorId: user.id,
+        action: 'CLAIM_ESCALATED',
+        oldStatus: claim.status,
+        newStatus: ClaimStatus.PENDING_FINANCE_APPROVAL,
+        metadata: { total: Number(claim.total), threshold: env.financeApprovalThreshold },
+      });
+      return;
+    }
 
     await tx.claim.update({
       where: { id: claimId },
@@ -352,7 +380,11 @@ export async function respondToInfoRequest(user: ScopeUser, claimId: string, inp
       attachedReceiptId = receipt.id;
     }
 
-    const newStatus = claim.status === ClaimStatus.INFO_REQUESTED ? ClaimStatus.PENDING_APPROVAL : claim.status;
+    // Answering an info request hands the claim back to whichever level asked.
+    let newStatus = claim.status;
+    if (claim.status === ClaimStatus.INFO_REQUESTED) {
+      newStatus = isAtFinanceStage(claim) ? ClaimStatus.PENDING_FINANCE_APPROVAL : ClaimStatus.PENDING_APPROVAL;
+    }
     await tx.claim.update({ where: { id: claimId }, data: { status: newStatus } });
     await tx.claimMessage.create({
       data: { claimId, senderId: user.id, type: ClaimMessageType.RESPONSE, message: input.message.trim(), attachedReceiptId },

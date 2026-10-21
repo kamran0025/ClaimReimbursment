@@ -14,7 +14,8 @@ beforeEach(async () => {
   users = await seedTestUsers();
 });
 
-async function createSubmittedClaim(claimantId: string, approverId: string, amount = 1000) {
+/** Submits a one-item claim and returns its id plus the automatically assigned approver. */
+async function createSubmittedClaim(claimantId: string, amount = 1000) {
   const claimant = agentAs(claimantId);
   const created = await claimant.post('/claims').send({ title: 'Test claim' });
   const claimId = created.body.data.id;
@@ -24,8 +25,8 @@ async function createSubmittedClaim(claimantId: string, approverId: string, amou
     description: 'Test item',
     amount,
   });
-  await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: approverId });
-  return claimId;
+  const submitted = await claimant.post(`/claims/${claimId}/submit`).send({});
+  return { claimId, approverId: submitted.body.data.assignedApproverId as string };
 }
 
 describe('security & data-integrity', () => {
@@ -40,16 +41,17 @@ describe('security & data-integrity', () => {
     expect(res.body.error.code).toBe('CLAIM_NOT_OWNED');
   });
 
-  it('Approver A cannot act on a claim assigned to Approver B', async () => {
-    const claimId = await createSubmittedClaim(users.claimantA.id, users.approverB.id);
-    const wrongApprover = agentAs(users.approverA.id);
+  it('an approver cannot act on a claim assigned to a different approver', async () => {
+    const { claimId, approverId } = await createSubmittedClaim(users.claimantA.id);
+    const otherId = approverId === users.approverA.id ? users.approverB.id : users.approverA.id;
+    const wrongApprover = agentAs(otherId);
     const res = await wrongApprover.post(`/claims/${claimId}/approve`).send({});
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('CLAIM_NOT_ASSIGNED');
   });
 
   it('Claimant cannot call approve/reject/request-info', async () => {
-    const claimId = await createSubmittedClaim(users.claimantA.id, users.approverA.id);
+    const { claimId } = await createSubmittedClaim(users.claimantA.id);
     const claimant = agentAs(users.claimantA.id);
     const approve = await claimant.post(`/claims/${claimId}/approve`).send({});
     expect(approve.status).toBe(403);
@@ -63,16 +65,21 @@ describe('security & data-integrity', () => {
   });
 
   it('Finance CAN approve/reject/request-info on any PENDING_APPROVAL claim (v2 change)', async () => {
-    const claimId = await createSubmittedClaim(users.claimantA.id, users.approverA.id);
+    const { claimId } = await createSubmittedClaim(users.claimantA.id);
     const finance = agentAs(users.finance.id);
     const res = await finance.post(`/claims/${claimId}/approve`).send({});
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('APPROVED');
   });
 
-  it('a claim cannot be submitted without assignedApproverId', async () => {
+  it('a client-supplied assignedApproverId is ignored; the server assigns the approver', async () => {
+    // Pre-load approver B so the least-loaded rule must pick approver A.
+    await createSubmittedClaim(users.claimantB.id);
+    const busy = await testPrisma.claim.findFirstOrThrow({ where: { claimantId: users.claimantB.id } });
+    const idle = busy.assignedApproverId === users.approverA.id ? users.approverB.id : users.approverA.id;
+
     const claimant = agentAs(users.claimantA.id);
-    const created = await claimant.post('/claims').send({ title: 'No approver' });
+    const created = await claimant.post('/claims').send({ title: 'Spoofed approver' });
     const claimId = created.body.data.id;
     await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
@@ -80,13 +87,14 @@ describe('security & data-integrity', () => {
       description: 'Item',
       amount: 100,
     });
-    const res = await claimant.post(`/claims/${claimId}/submit`).send({});
-    expect(res.status).toBe(400);
+    const res = await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: busy.assignedApproverId });
+    expect(res.status).toBe(200);
+    expect(res.body.data.assignedApproverId).toBe(idle);
   });
 
   it('an approved claim rejects direct PATCH mutation', async () => {
-    const claimId = await createSubmittedClaim(users.claimantA.id, users.approverA.id);
-    await agentAs(users.approverA.id).post(`/claims/${claimId}/approve`).send({});
+    const { claimId, approverId } = await createSubmittedClaim(users.claimantA.id);
+    await agentAs(approverId).post(`/claims/${claimId}/approve`).send({});
     const claimant = agentAs(users.claimantA.id);
     const res = await claimant.patch(`/claims/${claimId}`).send({ title: 'sneaky edit' });
     expect(res.status).toBe(409);
@@ -118,7 +126,7 @@ describe('security & data-integrity', () => {
     const claimant = agentAs(users.claimantA.id);
     const created = await claimant.post('/claims').send({ title: 'Empty claim' });
     const claimId = created.body.data.id;
-    const res = await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: users.approverA.id });
+    const res = await claimant.post(`/claims/${claimId}/submit`).send({});
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CLAIM_EMPTY_ITEMS');
   });
@@ -161,8 +169,8 @@ describe('security & data-integrity', () => {
   });
 
   it('the claimant cannot edit line items while INFO_REQUESTED, only respond + attach receipts', async () => {
-    const claimId = await createSubmittedClaim(users.claimantA.id, users.approverA.id);
-    const approver = agentAs(users.approverA.id);
+    const { claimId, approverId } = await createSubmittedClaim(users.claimantA.id);
+    const approver = agentAs(approverId);
     await approver.post(`/claims/${claimId}/request-info`).send({ message: 'need more detail' });
 
     const claimant = agentAs(users.claimantA.id);
@@ -181,8 +189,8 @@ describe('security & data-integrity', () => {
   });
 
   it('only the claimant can call respond-info on their own claim', async () => {
-    const claimId = await createSubmittedClaim(users.claimantA.id, users.approverA.id);
-    await agentAs(users.approverA.id).post(`/claims/${claimId}/request-info`).send({ message: 'need more detail' });
+    const { claimId, approverId } = await createSubmittedClaim(users.claimantA.id);
+    await agentAs(approverId).post(`/claims/${claimId}/request-info`).send({ message: 'need more detail' });
 
     const stranger = agentAs(users.claimantB.id);
     const res = await stranger.post(`/claims/${claimId}/respond-info`).send({ message: 'not mine' });

@@ -83,7 +83,7 @@ export function useDeleteReceipt(claimId: string) {
 export function useSubmitClaim(claimId: string) {
   const invalidate = useInvalidateClaims();
   return useMutation({
-    mutationFn: (assignedApproverId: string) => claimsApi.submitClaim(claimId, assignedApproverId),
+    mutationFn: () => claimsApi.submitClaim(claimId),
     onSuccess: () => invalidate(claimId),
   });
 }
@@ -91,7 +91,7 @@ export function useSubmitClaim(claimId: string) {
 export function useResubmitClaim(claimId: string) {
   const invalidate = useInvalidateClaims();
   return useMutation({
-    mutationFn: (assignedApproverId: string) => claimsApi.resubmitClaim(claimId, assignedApproverId),
+    mutationFn: () => claimsApi.resubmitClaim(claimId),
     onSuccess: () => invalidate(claimId),
   });
 }

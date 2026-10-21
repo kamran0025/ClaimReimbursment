@@ -31,16 +31,17 @@ describe('claim lifecycle — happy path', () => {
     expect(withItem.status).toBe(201);
     expect(withItem.body.data.total).toBe(500);
 
-    const submitted = await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: users.approverA.id });
+    const submitted = await claimant.post(`/claims/${claimId}/submit`).send({});
     expect(submitted.status).toBe(200);
     expect(submitted.body.data.status).toBe('PENDING_APPROVAL');
-    expect(submitted.body.data.assignedApproverId).toBe(users.approverA.id);
+    const approverId = submitted.body.data.assignedApproverId;
+    expect([users.approverA.id, users.approverB.id]).toContain(approverId);
 
-    const approver = agentAs(users.approverA.id);
+    const approver = agentAs(approverId);
     const approved = await approver.post(`/claims/${claimId}/approve`).send({});
     expect(approved.status).toBe(200);
     expect(approved.body.data.status).toBe('APPROVED');
-    expect(approved.body.data.decidedById).toBe(users.approverA.id);
+    expect(approved.body.data.decidedById).toBe(approverId);
 
     const auditActions = (await testPrisma.auditLog.findMany({ where: { claimId }, orderBy: { createdAt: 'asc' } })).map((a) => a.action);
     expect(auditActions).toEqual(['CLAIM_CREATED', 'ITEM_ADDED', 'CLAIM_SUBMITTED', 'CLAIM_APPROVED']);
@@ -56,9 +57,10 @@ describe('claim lifecycle — happy path', () => {
       description: 'Flight',
       amount: 8000,
     });
-    await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: users.approverA.id });
+    const submitted = await claimant.post(`/claims/${claimId}/submit`).send({});
+    const approverId = submitted.body.data.assignedApproverId;
 
-    const approver = agentAs(users.approverA.id);
+    const approver = agentAs(approverId);
     const infoRequested = await approver.post(`/claims/${claimId}/request-info`).send({ message: 'Attach the invoice please.' });
     expect(infoRequested.status).toBe(200);
     expect(infoRequested.body.data.status).toBe('INFO_REQUESTED');
@@ -96,9 +98,10 @@ describe('claim lifecycle — happy path', () => {
       description: 'Lunch',
       amount: 1200,
     });
-    await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: users.approverA.id });
+    const submitted = await claimant.post(`/claims/${claimId}/submit`).send({});
+    const approverId = submitted.body.data.assignedApproverId;
 
-    const approver = agentAs(users.approverA.id);
+    const approver = agentAs(approverId);
     const rejected = await approver.post(`/claims/${claimId}/reject`).send({ reason: 'Missing itemized bill.' });
     expect(rejected.status).toBe(200);
     expect(rejected.body.data.status).toBe('REJECTED');
@@ -107,11 +110,12 @@ describe('claim lifecycle — happy path', () => {
     const edited = await claimant.patch(`/claims/${claimId}`).send({ title: 'Team lunch (revised)' });
     expect(edited.status).toBe(200);
 
-    const resubmitted = await claimant.post(`/claims/${claimId}/resubmit`).send({ assignedApproverId: users.approverB.id });
+    const resubmitted = await claimant.post(`/claims/${claimId}/resubmit`).send({});
     expect(resubmitted.status).toBe(200);
     expect(resubmitted.body.data.status).toBe('PENDING_APPROVAL');
     expect(resubmitted.body.data.submissionCycle).toBe(2);
-    expect(resubmitted.body.data.assignedApproverId).toBe(users.approverB.id);
+    // Resubmission stays with the approver who rejected it.
+    expect(resubmitted.body.data.assignedApproverId).toBe(approverId);
     // Rejection fields clear on the live claim, but the audit trail keeps the history.
     expect(resubmitted.body.data.rejectionReason).toBeNull();
 
@@ -130,14 +134,14 @@ describe('claim lifecycle — happy path', () => {
       description: 'Hotel',
       amount: 3000,
     });
-    await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: users.approverA.id });
+    const submitted = await claimant.post(`/claims/${claimId}/submit`).send({});
 
     const finance = agentAs(users.finance.id);
     const approvedByFinance = await finance.post(`/claims/${claimId}/approve`).send({});
     expect(approvedByFinance.status).toBe(200);
     expect(approvedByFinance.body.data.decidedById).toBe(users.finance.id);
 
-    const approver = agentAs(users.approverA.id);
+    const approver = agentAs(submitted.body.data.assignedApproverId);
     const tooLate = await approver.post(`/claims/${claimId}/approve`).send({});
     expect(tooLate.status).toBe(409);
     expect(tooLate.body.error.code).toBe('CLAIM_NOT_PENDING_APPROVAL');

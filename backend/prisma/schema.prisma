@@ -22,6 +22,7 @@ enum Role {
 enum ClaimStatus {
   DRAFT
   PENDING_APPROVAL
+  PENDING_FINANCE_APPROVAL
   INFO_REQUESTED
   REJECTED
   APPROVED
@@ -46,6 +47,7 @@ enum AuditAction {
   CLAIM_CANCELLED
   CLAIM_INFO_REQUESTED
   CLAIM_INFO_RESPONDED
+  CLAIM_ESCALATED
   CLAIM_APPROVED
   CLAIM_REJECTED
 }
@@ -63,6 +65,7 @@ model User {
   claimsFiled      Claim[]        @relation("ClaimClaimant")
   claimsAssigned   Claim[]        @relation("ClaimAssignedApprover")
   claimsDecided    Claim[]        @relation("ClaimDecidedBy")
+  claimsEscalated  Claim[]        @relation("ClaimApproverApprovedBy")
   claimsRejected   Claim[]        @relation("ClaimRejectedBy")
   receiptsUploaded Receipt[]      @relation("ReceiptUploadedBy")
   messagesSent     ClaimMessage[] @relation("ClaimMessageSender")
@@ -72,30 +75,36 @@ model User {
 }
 
 model Claim {
-  id                 String      @id @default(cuid())
-  claimantId         String
-  title              String
-  status             ClaimStatus @default(DRAFT)
-  total              Decimal     @default(0) @db.Decimal(10, 2)
-  assignedApproverId String?
-  decidedById        String?
-  decidedAt          DateTime?
-  rejectionReason    String?
-  rejectedById       String?
-  rejectedAt         DateTime?
-  submittedAt        DateTime?
-  submissionCycle    Int         @default(1)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  id                   String      @id @default(cuid())
+  claimantId           String
+  title                String
+  status               ClaimStatus @default(DRAFT)
+  total                Decimal     @default(0) @db.Decimal(10, 2)
+  assignedApproverId   String?
+  decidedById          String?
+  decidedAt            DateTime?
+  // Level-1 sign-off on a claim above the Finance-approval threshold: the
+  // approver's approval escalates it to PENDING_FINANCE_APPROVAL instead of
+  // closing it. Cleared on (re)submit, like decidedById.
+  approverApprovedById String?
+  approverApprovedAt   DateTime?
+  rejectionReason      String?
+  rejectedById         String?
+  rejectedAt           DateTime?
+  submittedAt          DateTime?
+  submissionCycle      Int         @default(1)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 
-  claimant         User           @relation("ClaimClaimant", fields: [claimantId], references: [id])
-  assignedApprover User?          @relation("ClaimAssignedApprover", fields: [assignedApproverId], references: [id])
-  decidedBy        User?          @relation("ClaimDecidedBy", fields: [decidedById], references: [id])
-  rejectedBy       User?          @relation("ClaimRejectedBy", fields: [rejectedById], references: [id])
-  items            ClaimItem[]
-  receipts         Receipt[]
-  messages         ClaimMessage[]
-  auditLogs        AuditLog[]
+  claimant           User           @relation("ClaimClaimant", fields: [claimantId], references: [id])
+  assignedApprover   User?          @relation("ClaimAssignedApprover", fields: [assignedApproverId], references: [id])
+  decidedBy          User?          @relation("ClaimDecidedBy", fields: [decidedById], references: [id])
+  approverApprovedBy User?          @relation("ClaimApproverApprovedBy", fields: [approverApprovedById], references: [id])
+  rejectedBy         User?          @relation("ClaimRejectedBy", fields: [rejectedById], references: [id])
+  items              ClaimItem[]
+  receipts           Receipt[]
+  messages           ClaimMessage[]
+  auditLogs          AuditLog[]
 
   @@index([claimantId])
   @@index([status])

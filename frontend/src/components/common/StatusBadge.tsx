@@ -5,6 +5,7 @@ import { ClaimStatus, CLAIM_STATUS_LABELS } from '@/types/enums';
 const CLAIM_STATUS_COLOR: Record<ClaimStatus, BadgeColor> = {
   DRAFT: 'slate',
   PENDING_APPROVAL: 'amber',
+  PENDING_FINANCE_APPROVAL: 'purple',
   INFO_REQUESTED: 'orange',
   REJECTED: 'red',
   APPROVED: 'green',

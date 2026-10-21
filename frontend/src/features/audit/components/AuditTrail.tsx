@@ -15,6 +15,7 @@ const ACTION_LABELS: Record<string, string> = {
   CLAIM_CANCELLED: 'Claim cancelled',
   CLAIM_INFO_REQUESTED: 'Information requested',
   CLAIM_INFO_RESPONDED: 'Claimant responded to info request',
+  CLAIM_ESCALATED: 'Approved by approver — sent to Finance for final approval',
   CLAIM_APPROVED: 'Claim approved',
   CLAIM_REJECTED: 'Claim rejected',
 };

@@ -51,12 +51,12 @@ describe('RBAC matrix', () => {
       description: 'Item',
       amount: 100,
     });
-    await claimant.post(`/claims/${claimId}/submit`).send({ assignedApproverId: users.approverA.id });
+    const submitted = await claimant.post(`/claims/${claimId}/submit`).send({});
+    const assignedId = submitted.body.data.assignedApproverId;
+    const otherId = assignedId === users.approverA.id ? users.approverB.id : users.approverA.id;
 
-    const approverA = agentAs(users.approverA.id);
-    const approverB = agentAs(users.approverB.id);
-    expect((await approverA.get('/claims')).body.data.items).toHaveLength(1);
-    expect((await approverB.get('/claims')).body.data.items).toHaveLength(0);
+    expect((await agentAs(assignedId).get('/claims')).body.data.items).toHaveLength(1);
+    expect((await agentAs(otherId).get('/claims')).body.data.items).toHaveLength(0);
   });
 
   it('only Finance can access the global audit log and CSV export', async () => {

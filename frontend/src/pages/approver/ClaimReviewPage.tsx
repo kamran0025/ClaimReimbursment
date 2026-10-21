@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/Button';
 import { useClaim } from '@/features/claims/hooks/useClaims';
 import { ClaimDetailView } from '@/features/claims/components/ClaimDetailView';
 import { ClaimDecisionActions } from '@/features/claims/components/ClaimDecisionActions';
-import { isInReview } from '@/services/api/stateMachine';
+import { useAuth } from '@/app/AuthContext';
+import { canDecideClaim, isAtFinanceStage } from '@/services/api/stateMachine';
+import { CLAIM_STATUS_LABELS } from '@/types/enums';
 
 /**
  * v2: a single decision point — Approve / Reject / Request Info — with no
@@ -16,12 +18,13 @@ import { isInReview } from '@/services/api/stateMachine';
 export function ClaimReviewPage() {
   const { claimId } = useParams<{ claimId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: claim, isLoading, isError, error, refetch } = useClaim(claimId);
 
   if (isLoading) return <PageSpinner />;
   if (isError || !claim) return <ErrorState error={error} onRetry={() => refetch()} />;
 
-  const canDecide = isInReview(claim.status);
+  const canDecide = !!user && canDecideClaim(claim, user);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -29,7 +32,9 @@ export function ClaimReviewPage() {
 
       {!canDecide && (
         <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          This claim is {claim.status.replace('_', ' ').toLowerCase()} — no action is available.
+          {isAtFinanceStage(claim)
+            ? 'You approved this claim. It is above the Finance-approval limit and is now waiting for Finance to make the final decision.'
+            : `This claim is ${CLAIM_STATUS_LABELS[claim.status].toLowerCase()} — no action is available.`}
         </div>
       )}
 

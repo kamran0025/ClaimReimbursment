@@ -23,11 +23,6 @@ export const claimItemSchema = z.object({
 });
 export type ClaimItemInput = z.infer<typeof claimItemSchema>;
 
-export const submitClaimSchema = z.object({
-  assignedApproverId: z.string().trim().min(1, 'Select an approver before submitting.'),
-});
-export type SubmitClaimInput = z.infer<typeof submitClaimSchema>;
-
 export const rejectClaimSchema = z.object({
   reason: z.string().trim().min(1, 'A rejection reason is required.'),
 });

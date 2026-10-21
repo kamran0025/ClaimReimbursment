@@ -86,6 +86,11 @@ export interface Claim {
   /** Whoever (the assigned approver, or Finance) approved/rejected this submission cycle. */
   decidedById: string | null;
   decidedAt: string | null;
+  /** The approver whose sign-off escalated this claim to Finance (claims above the threshold). */
+  approverApprovedById: string | null;
+  approverApprovedAt: string | null;
+  /** Total is above the Finance-approval threshold, so the approver's approval escalates rather than closes it. */
+  requiresFinanceApproval: boolean;
   submissionCycle: number;
   rejectionReason: string | null;
   rejectedById: string | null;
@@ -97,6 +102,7 @@ export interface Claim {
   claimant?: Pick<User, 'id' | 'name' | 'email'>;
   assignedApprover?: Pick<User, 'id' | 'name' | 'email'> | null;
   decidedBy?: Pick<User, 'id' | 'name' | 'email'> | null;
+  approverApprovedBy?: Pick<User, 'id' | 'name' | 'email'> | null;
 }
 
 // Composite shape returned by the "get claim detail" endpoint.

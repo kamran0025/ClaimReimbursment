@@ -33,6 +33,12 @@ function parseCloudinary() {
   return { cloudName, apiKey, apiSecret, folder: process.env.CLOUDINARY_FOLDER ?? 'receipts' };
 }
 
+function parseThreshold(raw: string | undefined): number {
+  const value = Number(raw ?? 25000);
+  if (!Number.isFinite(value) || value < 0) throw new Error('FINANCE_APPROVAL_THRESHOLD must be a non-negative number');
+  return value;
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
@@ -45,4 +51,7 @@ export const env = {
   cloudinary: parseCloudinary(),
   maxReceiptSizeBytes: Number(process.env.MAX_RECEIPT_SIZE_BYTES ?? 5 * 1024 * 1024),
   cookieSecure: process.env.COOKIE_SECURE === 'true',
+  // Claims with a total strictly above this (INR) need Finance sign-off after
+  // the assigned approver approves — see claimStateMachine.ts.
+  financeApprovalThreshold: parseThreshold(process.env.FINANCE_APPROVAL_THRESHOLD),
 };

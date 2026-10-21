@@ -70,16 +70,28 @@ and not be more than 24h in the future.
 
 | Method & Path | Auth | Body |
 |---|---|---|
-| `POST /claims/:id/approve` | assigned approver or Finance | — |
-| `POST /claims/:id/reject` | assigned approver or Finance | `{ reason }` (non-empty) |
-| `POST /claims/:id/request-info` | assigned approver or Finance | `{ message }` (non-empty) |
+| `POST /claims/:id/approve` | assigned approver or Finance (Finance only at the Finance stage) | — |
+| `POST /claims/:id/reject` | assigned approver or Finance (Finance only at the Finance stage) | `{ reason }` (non-empty) |
+| `POST /claims/:id/request-info` | assigned approver or Finance (Finance only at the Finance stage) | `{ message }` (non-empty) |
 | `POST /claims/:id/respond-info` | claimant, own claim | `{ message, attachedReceiptId? }` |
 | `GET /claims/:id/messages` | scoped | Returns `ClaimMessage[]`. |
 
-All decision endpoints require the claim to be `PENDING_APPROVAL` or
-`INFO_REQUESTED` (`isInReview`). `respond-info` moves `INFO_REQUESTED` back
-to `PENDING_APPROVAL`; if called while already `PENDING_APPROVAL` (a
-proactive message), the status doesn't change.
+All decision endpoints require the claim to be `PENDING_APPROVAL`,
+`PENDING_FINANCE_APPROVAL` or `INFO_REQUESTED` (`isInReview`). `respond-info`
+moves `INFO_REQUESTED` back to whichever level asked (`PENDING_APPROVAL`, or
+`PENDING_FINANCE_APPROVAL` at the Finance stage); if called while already
+pending (a proactive message), the status doesn't change.
+
+**Approval hierarchy.** A claim whose total is above
+`FINANCE_APPROVAL_THRESHOLD` (default `25000`, strictly greater than) needs
+two sign-offs. When its assigned approver calls `approve`, the claim moves to
+`PENDING_FINANCE_APPROVAL` (audit action `CLAIM_ESCALATED`; the claim records
+`approverApprovedById`/`approverApprovedAt`) instead of `APPROVED`. From then
+on only Finance may approve, reject or request info — the approver gets
+`403 FINANCE_APPROVAL_REQUIRED`. A Finance approval is always final, at either
+level. A Finance rejection sends the claim back to `REJECTED`, and a resubmit
+starts again at the approver. Every serialized claim carries
+`requiresFinanceApproval: boolean`.
 
 > **Integration note for whoever swaps the frontend's mock `services/api`
 > for real HTTP calls:** the mock's `respondToInfoRequest(claimId, {message,
@@ -110,7 +122,7 @@ proactive message), the status doesn't change.
 | Method & Path | Auth | Returns |
 |---|---|---|
 | `GET /dashboards/claimant` | `CLAIMANT` | `{ counts, recentClaims }` |
-| `GET /dashboards/approver` | `APPROVER` | `{ pendingCount, infoRequestedCount, approvedToday, rejectedCount, totalPendingAmount, pendingClaims }` |
+| `GET /dashboards/approver` | `APPROVER` | `{ pendingCount, infoRequestedCount, approvedToday, rejectedCount, awaitingFinanceCount, totalPendingAmount, pendingClaims }` — claims escalated to Finance are excluded from `pendingCount`/`pendingClaims`. |
 | `GET /dashboards/finance` | `FINANCE` | `{ counts, totalApprovedAmount, totalClaims }` |
 
 ## Reimbursement — dropped

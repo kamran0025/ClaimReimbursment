@@ -47,6 +47,21 @@ export function ClaimSummaryCard({ claim, showClaimant }: { claim: ClaimDetail; 
           </p>
         )}
 
+        {claim.approverApprovedBy && (
+          <p className="mt-3 text-xs text-slate-400">
+            Approver sign-off by {claim.approverApprovedBy.name} · {formatDate(claim.approverApprovedAt)}
+          </p>
+        )}
+
+        {claim.status === 'PENDING_FINANCE_APPROVAL' && (
+          <div className="mt-4 rounded-md border border-purple-200 bg-purple-50 px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">Awaiting Finance approval</p>
+            <p className="mt-0.5 text-sm text-purple-800">
+              The approver has signed off. Claims of this amount also need a final approval from Finance.
+            </p>
+          </div>
+        )}
+
         {claim.status === 'INFO_REQUESTED' && (
           <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Information requested</p>

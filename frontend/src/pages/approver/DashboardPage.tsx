@@ -55,10 +55,11 @@ export function ApproverDashboardPage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard label="Pending your review" value={data.pendingCount} accent="amber" />
             <StatCard label="Awaiting claimant" value={data.infoRequestedCount} accent="orange" />
             <StatCard label="Approved today" value={data.approvedToday} accent="green" />
+            <StatCard label="Sent to Finance" value={data.awaitingFinanceCount} accent="purple" />
             <StatCard label="Rejected (all time)" value={data.rejectedCount} accent="red" />
             <StatCard label="Total pending amount" value={formatInr(data.totalPendingAmount)} accent="slate" />
           </div>

@@ -13,9 +13,12 @@ export type Role = (typeof Role)[keyof typeof Role];
 // is dropped (submit goes straight to PENDING_APPROVAL — there's no chain to
 // build first); `INFO_REQUESTED` is added for the clarification workflow.
 // `APPROVED` is terminal — this app does not track post-approval payout.
+// `PENDING_FINANCE_APPROVAL`: a claim above the Finance-approval threshold
+// that its approver has signed off, now waiting on Finance's final decision.
 export const ClaimStatus = {
   DRAFT: 'DRAFT',
   PENDING_APPROVAL: 'PENDING_APPROVAL',
+  PENDING_FINANCE_APPROVAL: 'PENDING_FINANCE_APPROVAL',
   INFO_REQUESTED: 'INFO_REQUESTED',
   REJECTED: 'REJECTED',
   APPROVED: 'APPROVED',
@@ -47,6 +50,7 @@ export const AuditAction = {
   CLAIM_CANCELLED: 'CLAIM_CANCELLED',
   CLAIM_INFO_REQUESTED: 'CLAIM_INFO_REQUESTED',
   CLAIM_INFO_RESPONDED: 'CLAIM_INFO_RESPONDED',
+  CLAIM_ESCALATED: 'CLAIM_ESCALATED',
   CLAIM_APPROVED: 'CLAIM_APPROVED',
   CLAIM_REJECTED: 'CLAIM_REJECTED',
 } as const;
@@ -55,6 +59,7 @@ export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
 export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
   DRAFT: 'Draft',
   PENDING_APPROVAL: 'Pending Approval',
+  PENDING_FINANCE_APPROVAL: 'Pending Finance Approval',
   INFO_REQUESTED: 'Info Requested',
   REJECTED: 'Rejected',
   APPROVED: 'Approved',

@@ -1,6 +1,8 @@
 // Maps Prisma models to the exact JSON shapes frontend/src/types/models.ts
 // expects (amounts as `number`, dates as ISO strings, relations picked down
 // to {id,name,email[,role]}).
+import { env } from '../lib/env';
+import { requiresFinanceApproval } from './claimStateMachine';
 import type { AuditLog, Claim, ClaimItem, ClaimMessage, Receipt, User } from '@prisma/client';
 
 export type PickedUser = Pick<User, 'id' | 'name' | 'email'>;
@@ -26,6 +28,7 @@ type ClaimWithRelations = Claim & {
   claimant?: User | null;
   assignedApprover?: User | null;
   decidedBy?: User | null;
+  approverApprovedBy?: User | null;
 };
 
 export function serializeClaim(claim: ClaimWithRelations) {
@@ -38,6 +41,9 @@ export function serializeClaim(claim: ClaimWithRelations) {
     assignedApproverId: claim.assignedApproverId,
     decidedById: claim.decidedById,
     decidedAt: claim.decidedAt ? claim.decidedAt.toISOString() : null,
+    approverApprovedById: claim.approverApprovedById,
+    approverApprovedAt: claim.approverApprovedAt ? claim.approverApprovedAt.toISOString() : null,
+    requiresFinanceApproval: requiresFinanceApproval(claim.total, env.financeApprovalThreshold),
     submissionCycle: claim.submissionCycle,
     rejectionReason: claim.rejectionReason,
     rejectedById: claim.rejectedById,
@@ -48,6 +54,7 @@ export function serializeClaim(claim: ClaimWithRelations) {
     claimant: claim.claimant ? pickUser(claim.claimant) ?? undefined : undefined,
     assignedApprover: 'assignedApprover' in claim ? pickUser(claim.assignedApprover) : undefined,
     decidedBy: 'decidedBy' in claim ? pickUser(claim.decidedBy) : undefined,
+    approverApprovedBy: 'approverApprovedBy' in claim ? pickUser(claim.approverApprovedBy) : undefined,
   };
 }
 

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ClaimDetail, User } from '@/types/models';
 import { Role } from '@/types/enums';
-import { isInReview } from '@/services/api/stateMachine';
+import { canDecideClaim, isAtFinanceStage, isInReview } from '@/services/api/stateMachine';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
@@ -114,7 +114,7 @@ export type MessagingCapability = 'respond' | 'requestInfo' | 'view';
 export function getMessagingCapability(claim: ClaimDetail, user: User | null): MessagingCapability {
   if (!user || !isInReview(claim.status)) return 'view';
   if (claim.claimantId === user.id) return 'respond';
-  if (user.role === Role.FINANCE || claim.assignedApproverId === user.id) return 'requestInfo';
+  if (canDecideClaim(claim, user)) return 'requestInfo';
   return 'view';
 }
 
@@ -127,6 +127,7 @@ function readOnlyReason(claim: ClaimDetail, user: User | null): string {
   if (!user) return 'Sign in to send a message.';
   if (!isInReview(claim.status)) return 'This claim is closed — no further messages can be sent.';
   if (user.role === Role.CLAIMANT) return 'You can only send messages on your own claims.';
+  if (isAtFinanceStage(claim)) return 'This claim is with Finance for final approval.';
   return 'This claim is not assigned to you.';
 }
 

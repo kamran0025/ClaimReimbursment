@@ -126,12 +126,12 @@ export async function deleteReceipt(claimId: string, receiptId: string): Promise
 // ---------------------------------------------------------------------------
 // Submit / resubmit / cancel
 // ---------------------------------------------------------------------------
-export async function submitClaim(claimId: string, assignedApproverId: string): Promise<ClaimDetail> {
-  return normalizeClaimDetail(await apiPost<ClaimDetail>(`/claims/${claimId}/submit`, { assignedApproverId }));
+export async function submitClaim(claimId: string): Promise<ClaimDetail> {
+  return normalizeClaimDetail(await apiPost<ClaimDetail>(`/claims/${claimId}/submit`, {}));
 }
 
-export async function resubmitClaim(claimId: string, assignedApproverId: string): Promise<ClaimDetail> {
-  return normalizeClaimDetail(await apiPost<ClaimDetail>(`/claims/${claimId}/resubmit`, { assignedApproverId }));
+export async function resubmitClaim(claimId: string): Promise<ClaimDetail> {
+  return normalizeClaimDetail(await apiPost<ClaimDetail>(`/claims/${claimId}/resubmit`, {}));
 }
 
 export async function cancelClaim(claimId: string): Promise<ClaimDetail> {
