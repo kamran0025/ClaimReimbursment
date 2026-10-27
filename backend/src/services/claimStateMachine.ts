@@ -96,6 +96,33 @@ export function assertDecidable(
   }
 }
 
+/**
+ * The claim is still with its approver — submitted, undecided, and not yet
+ * signed off to Finance — so its approver may be changed (delegation).
+ */
+export function isReassignable(claim: Pick<Claim, 'status' | 'approverApprovedById'>): boolean {
+  return (
+    (claim.status === ClaimStatus.PENDING_APPROVAL || claim.status === ClaimStatus.INFO_REQUESTED) &&
+    claim.approverApprovedById == null
+  );
+}
+
+/** Who may change a claim's approver: its current assigned approver, or any Finance user. */
+export function assertReassignable(
+  claim: Pick<Claim, 'status' | 'assignedApproverId' | 'approverApprovedById'>,
+  user: { id: string; role: Role },
+): void {
+  if (user.role !== Role.FINANCE && claim.assignedApproverId !== user.id) {
+    throw new ApiError(ErrorCode.CLAIM_NOT_ASSIGNED, 'This claim is not assigned to you.');
+  }
+  if (!isReassignable(claim)) {
+    throw new ApiError(
+      ErrorCode.CLAIM_NOT_REASSIGNABLE,
+      `The approver can only be changed while the claim is awaiting the approver's decision (status: ${claim.status}).`,
+    );
+  }
+}
+
 /** Only the claimant, and only while the claim is still in review, may post a response/message. */
 export function assertRespondable(claim: Pick<Claim, 'status' | 'claimantId'>, user: { id: string }): void {
   if (!isInReview(claim.status)) {

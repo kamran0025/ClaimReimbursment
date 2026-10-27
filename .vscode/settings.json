@@ -1,0 +1,4 @@
+{
+  // backend/ is pinned to Prisma 6.19.3; stop the Prisma extension validating schema.prisma against Prisma 7 rules.
+  "prisma.pinToPrisma6": true
+}

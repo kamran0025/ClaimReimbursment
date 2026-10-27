@@ -19,7 +19,7 @@ auditRouter.get(
     const claim = await prisma.claim.findUnique({ where: { id: req.params.claimId } });
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertClaimInScope({ id: req.user!.id, role: req.user!.role }, claim);
-    res.json(ok(await listAuditForClaim(req.params.claimId)));
+    res.json(ok(await listAuditForClaim(req.params.claimId, req.user!.role)));
   }),
 );
 

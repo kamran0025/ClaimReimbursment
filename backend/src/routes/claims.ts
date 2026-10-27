@@ -16,6 +16,8 @@ import {
   requestInfoSchema,
   respondInfoSchema,
   listClaimsQuerySchema,
+  reassignClaimSchema,
+  bulkReassignClaimsSchema,
 } from '../validation/claimValidation';
 import { listClaims, getClaimDetail } from '../services/claimQueryService';
 import {
@@ -34,6 +36,7 @@ import {
 } from '../services/claimMutationService';
 import { addReceipt, deleteReceipt, getReceiptForDownload } from '../services/receiptService';
 import { listMessagesForClaim } from '../services/claimMessageService';
+import { reassignClaim, reassignClaimsBulk } from '../services/claimReassignmentService';
 
 export const claimsRouter = Router();
 
@@ -238,6 +241,30 @@ claimsRouter.get(
   '/:id/messages',
   asyncHandler(async (req, res) => {
     const result = await listMessagesForClaim(scopeUser(req), req.params.id);
+    res.json(ok(result));
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Approver delegation — the claim's current approver, or Finance, hands it to
+// another approver. Bulk: a selection of claims, or one approver's whole open queue.
+// ---------------------------------------------------------------------------
+claimsRouter.post(
+  '/reassign',
+  authorizeDecisionMaker,
+  validateBody(bulkReassignClaimsSchema),
+  asyncHandler(async (req, res) => {
+    const result = await reassignClaimsBulk(scopeUser(req), req.body);
+    res.json(ok(result));
+  }),
+);
+
+claimsRouter.post(
+  '/:id/reassign',
+  authorizeDecisionMaker,
+  validateBody(reassignClaimSchema),
+  asyncHandler(async (req, res) => {
+    const result = await reassignClaim(scopeUser(req), req.params.id, req.body);
     res.json(ok(result));
   }),
 );

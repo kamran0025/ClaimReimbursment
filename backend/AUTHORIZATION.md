@@ -33,7 +33,7 @@ the service layer:
 
 | Route | Gate |
 |---|---|
-| `POST /claims/:id/approve` \| `reject` \| `request-info` | `authorizeDecisionMaker` → `APPROVER` or `FINANCE` |
+| `POST /claims/:id/approve` \| `reject` \| `request-info` \| `reassign`, `POST /claims/reassign` | `authorizeDecisionMaker` → `APPROVER` or `FINANCE` |
 | `GET /audit` (global) | `FINANCE` |
 | `GET /finance/export` | `FINANCE` |
 | `GET /users/employees` | `FINANCE` |
@@ -54,6 +54,7 @@ is gated to `CLAIMANT` — see below).
 | View claim | ✅ own only | ✅ only if `assignedApproverId === self` | ✅ any non-DRAFT |
 | Submit / resubmit (choose approver) | ✅ own only | ❌ | ❌ |
 | Approve / Reject / Request info | ❌ | ✅ only if assigned to self **and** status is `PENDING_APPROVAL`/`INFO_REQUESTED`, and the claim has not been escalated to Finance (`FINANCE_APPROVAL_REQUIRED` otherwise) | ✅ any claim in review (incl. `PENDING_FINANCE_APPROVAL`), regardless of assignment — the only role that can make the final decision on a claim above `FINANCE_APPROVAL_THRESHOLD` |
+| Change a claim's approver (single or bulk) | ❌ | ✅ only claims assigned to self, still with the approver (`PENDING_APPROVAL`/`INFO_REQUESTED`, not escalated) | ✅ any claim still with its approver, from any approver |
 | Respond to an info request | ✅ own claim only | ❌ | ❌ |
 | Upload receipt | ✅ own claim's | ❌ | ❌ |
 | View / download receipt | ✅ own claim's | ✅ assigned claim's | ✅ any non-DRAFT claim's |
@@ -65,7 +66,7 @@ Enforced by, respectively: `createClaim`'s explicit role check;
 `getClaimScopeFilter`/`assertClaimInScope`; `assertOwner` +
 `assertSubmittable`; `assertDecidable` (checks `isInReview(status)` **and**
 `role === FINANCE || assignedApproverId === user.id`); `assertRespondable`
-(`isInReview(status) && claimantId === user.id`); `assertOwner` (+ the
+(`isInReview(status) && claimantId === user.id`); `assertReassignable` (assignment checked before status, then `isReassignable`) for approver changes; `assertOwner` (+ the
 `INFO_REQUESTED`-specific "no existing item may be touched" rule) for
 receipts; `assertCancellable`.
 
@@ -89,5 +90,5 @@ Authorization-relevant ones: `UNAUTHENTICATED` → 401, `FORBIDDEN_ROLE` /
 `CLAIM_NOT_OWNED` / `CLAIM_NOT_ASSIGNED` → 403, `CLAIM_NOT_FOUND` /
 `ITEM_NOT_FOUND` / `RECEIPT_NOT_FOUND` → 404, everything state-machine
 related (`CLAIM_NOT_EDITABLE`, `CLAIM_NOT_PENDING_APPROVAL`,
-`CLAIM_NOT_CANCELLABLE`, `CLAIM_INVALID_TRANSITION`, `CLAIM_EMPTY_ITEMS`,
+`CLAIM_NOT_CANCELLABLE`, `CLAIM_NOT_REASSIGNABLE`, `CLAIM_INVALID_TRANSITION`, `CLAIM_EMPTY_ITEMS`,
 `CLAIM_TOTAL_MISMATCH`) → 409.

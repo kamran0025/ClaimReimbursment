@@ -93,6 +93,25 @@ level. A Finance rejection sends the claim back to `REJECTED`, and a resubmit
 starts again at the approver. Every serialized claim carries
 `requiresFinanceApproval: boolean`.
 
+### Approver delegation
+
+| Method & Path | Auth | Body | Notes |
+|---|---|---|---|
+| `POST /claims/:id/reassign` | the claim's assigned approver, or Finance | `{ toApproverId, reason? }` | Hands one claim to another active approver. Returns `ClaimDetail`. |
+| `POST /claims/reassign` | approver or Finance | `{ toApproverId, reason?, claimIds? }` **or** `{ toApproverId, reason?, fromApproverId? }` | Bulk, all-or-nothing. With `claimIds` (1–100), every claim must pass the single-claim rules. Otherwise moves every claim still with `fromApproverId` — an approver may omit it (defaults to themselves) and may not name anyone else; Finance must pass it. Returns `{ reassignedCount, claimIds, toApproverId }`. |
+
+Only claims still with their approver can be reassigned: `PENDING_APPROVAL`
+or `INFO_REQUESTED` and not yet escalated (`approverApprovedById` null) —
+otherwise `409 CLAIM_NOT_REASSIGNABLE`. The target must be an active
+`APPROVER` other than the current one (`400 VALIDATION_ERROR`, `field:
+toApproverId`). Status is unchanged. Each reassigned claim gets a
+`CLAIM_REASSIGNED` audit row (`{ fromApproverId, toApproverId, reason?,
+bulk? }`) and a sender-less `APPROVER_CHANGED` message with fixed wording.
+The new approver sees the whole history (messages, receipts, audit); the
+previous one loses access. A later resubmission stays with the new approver.
+Claimants never see `CLAIM_REASSIGNED` rows in `GET /audit/claims/:claimId`;
+the `APPROVER_CHANGED` message is all they get.
+
 > **Integration note for whoever swaps the frontend's mock `services/api`
 > for real HTTP calls:** the mock's `respondToInfoRequest(claimId, {message,
 > receiptFile})` does a file upload *and* posts the response message in one
@@ -108,7 +127,7 @@ starts again at the approver. Every serialized claim carries
 
 | Method & Path | Auth | Notes |
 |---|---|---|
-| `GET /audit/claims/:claimId` | scoped (same as claim detail) | Full audit trail for one claim, oldest first. |
+| `GET /audit/claims/:claimId` | scoped (same as claim detail) | Full audit trail for one claim, oldest first. `CLAIM_REASSIGNED` rows are omitted for claimants. |
 | `GET /audit` | `FINANCE` | Global, paginated. Query: `claimId?`, `action?`, `page?`, `pageSize?`. *(Not in the original plan's endpoint list — added because the frontend's Finance "Audit Logs" page calls `listAllAudit`.)* |
 
 ## Finance

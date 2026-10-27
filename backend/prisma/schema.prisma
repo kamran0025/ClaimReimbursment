@@ -32,6 +32,9 @@ enum ClaimStatus {
 enum ClaimMessageType {
   INFO_REQUEST
   RESPONSE
+  // System notice telling the claimant their approver was changed. Has no
+  // sender, and deliberately carries no from/to/reason details.
+  APPROVER_CHANGED
 }
 
 enum AuditAction {
@@ -50,6 +53,7 @@ enum AuditAction {
   CLAIM_ESCALATED
   CLAIM_APPROVED
   CLAIM_REJECTED
+  CLAIM_REASSIGNED
 }
 
 model User {
@@ -152,14 +156,15 @@ model Receipt {
 model ClaimMessage {
   id                String           @id @default(cuid())
   claimId           String
-  senderId          String
+  // Null for system notices (APPROVER_CHANGED).
+  senderId          String?
   type              ClaimMessageType
   message           String
   attachedReceiptId String?
   createdAt         DateTime         @default(now())
 
   claim           Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
-  sender          User     @relation("ClaimMessageSender", fields: [senderId], references: [id])
+  sender          User?    @relation("ClaimMessageSender", fields: [senderId], references: [id])
   attachedReceipt Receipt? @relation("ClaimMessageAttachedReceipt", fields: [attachedReceiptId], references: [id], onDelete: SetNull)
 
   @@index([claimId])

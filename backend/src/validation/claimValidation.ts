@@ -39,6 +39,25 @@ export const respondInfoSchema = z.object({
 });
 export type RespondInfoInput = z.infer<typeof respondInfoSchema>;
 
+const reassignFields = {
+  toApproverId: z.string().trim().min(1, 'Select the approver to hand the claim to.'),
+  reason: z.string().trim().max(500, 'Reason is too long').optional(),
+};
+
+export const reassignClaimSchema = z.object(reassignFields);
+export type ReassignClaimInput = z.infer<typeof reassignClaimSchema>;
+
+// Either an explicit selection of claims, or every open claim of one approver
+// (`fromApproverId`, defaulting to the caller for an approver handing over their own queue).
+export const bulkReassignClaimsSchema = z
+  .object({
+    ...reassignFields,
+    claimIds: z.array(z.string().trim().min(1)).min(1, 'Select at least one claim.').max(100, 'At most 100 claims at a time.').optional(),
+    fromApproverId: z.string().trim().min(1).optional(),
+  })
+  .refine((v) => !(v.claimIds && v.fromApproverId), { message: 'Pass either claimIds or fromApproverId, not both.', path: ['claimIds'] });
+export type BulkReassignClaimsInput = z.infer<typeof bulkReassignClaimsSchema>;
+
 export const listClaimsQuerySchema = z.object({
   status: z.union([z.string(), z.array(z.string())]).optional(),
   claimantId: z.string().optional(),

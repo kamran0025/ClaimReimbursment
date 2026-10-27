@@ -1,4 +1,4 @@
-import { Prisma, type AuditAction, type ClaimStatus } from '@prisma/client';
+import { Prisma, Role, type AuditAction, type ClaimStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { serializeAudit } from './serializers';
 import { resolvePage, type PageParams } from '../utils/paginate';
@@ -27,9 +27,14 @@ export async function recordAudit(tx: Prisma.TransactionClient, input: RecordAud
   });
 }
 
-export async function listAuditForClaim(claimId: string) {
+/**
+ * A claimant only learns that their approver changed (from the APPROVER_CHANGED
+ * message), never who moved the claim, to whom or why — so reassignment rows
+ * are left out of their view of the trail.
+ */
+export async function listAuditForClaim(claimId: string, viewerRole: Role) {
   const logs = await prisma.auditLog.findMany({
-    where: { claimId },
+    where: { claimId, ...(viewerRole === Role.CLAIMANT ? { action: { not: 'CLAIM_REASSIGNED' as const } } : {}) },
     include: { actor: true },
     orderBy: { createdAt: 'asc' },
   });
