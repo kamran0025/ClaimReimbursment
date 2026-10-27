@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { ClaimDetail } from '@/types/models';
@@ -15,7 +15,6 @@ import { useAuth } from '@/app/AuthContext';
 import { useToast } from '@/app/ToastContext';
 
 const schema = z.object({
-  fromApproverId: z.string(),
   toApproverId: z.string().min(1, 'Select an approver'),
   reason: z.string().trim().max(500, 'Reason is too long'),
 });
@@ -27,26 +26,21 @@ interface ReassignModalProps {
   title: string;
   description: string;
   confirmLabel: string;
-  /** Approver the claim(s) currently sit with — excluded from the target list. Omit to let the user pick (Finance bulk). */
-  fromApproverId?: string | null;
+  /** Approver the claim(s) currently sit with — excluded from the target list. `null` when that may vary (Finance selection). */
+  fromApproverId: string | null;
   isSubmitting: boolean;
   submitError: unknown;
-  onSubmit: (values: { fromApproverId: string; toApproverId: string; reason?: string }) => Promise<void>;
+  onSubmit: (values: { toApproverId: string; reason?: string }) => Promise<void>;
 }
 
 function ReassignModal({ isOpen, onClose, title, description, confirmLabel, fromApproverId, isSubmitting, submitError, onSubmit }: ReassignModalProps) {
   const { data: approvers } = useActiveApprovers();
-  const pickFrom = fromApproverId === undefined;
   const {
     register,
     handleSubmit,
     reset,
-    control,
-    setError,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { fromApproverId: '', toApproverId: '', reason: '' } });
-  const pickedFrom = useWatch({ control, name: 'fromApproverId' });
-  const from = pickFrom ? pickedFrom : (fromApproverId ?? '');
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { toApproverId: '', reason: '' } });
   const close = () => {
     reset();
     onClose();
@@ -56,29 +50,16 @@ function ReassignModal({ isOpen, onClose, title, description, confirmLabel, from
     <Modal isOpen={isOpen} onClose={close} title={title} size="md">
       <form
         onSubmit={handleSubmit(async (values) => {
-          if (pickFrom && !values.fromApproverId) {
-            setError('fromApproverId', { message: 'Select an approver' });
-            return;
-          }
-          await onSubmit({ fromApproverId: from, toApproverId: values.toApproverId, reason: values.reason || undefined });
+          await onSubmit({ toApproverId: values.toApproverId, reason: values.reason || undefined });
           reset();
         })}
         className="flex flex-col gap-4"
         noValidate
       >
         <p className="text-sm text-slate-600">{description}</p>
-        {pickFrom && (
-          <Select label="From approver" placeholder="Select an approver" error={errors.fromApproverId?.message} {...register('fromApproverId')}>
-            {approvers?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </Select>
-        )}
         <Select label="Hand over to" placeholder="Select an approver" error={errors.toApproverId?.message} {...register('toApproverId')}>
           {approvers
-            ?.filter((a) => a.id !== from)
+            ?.filter((a) => a.id !== fromApproverId)
             .map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -152,33 +133,45 @@ export function ReassignClaimAction({ claim, onReassigned }: { claim: ClaimDetai
 }
 
 /**
- * Bulk handover of every claim still with an approver. An approver hands over
- * their own queue (`fromApproverId` fixed to themselves); Finance picks whose.
+ * "Change Approver" for a selection of claims — all-or-nothing on the server.
+ * `fromApproverId` only drops that approver from the target list; pass `null`
+ * when the selection may span approvers (Finance).
  */
-export function BulkReassignAction({ fromApproverId, label }: { fromApproverId?: string; label: string }) {
+export function BulkReassignAction({
+  claimIds,
+  fromApproverId,
+  label,
+  onDone,
+}: {
+  claimIds: string[];
+  fromApproverId: string | null;
+  label: string;
+  onDone?: () => void;
+}) {
   const toast = useToast();
   const bulk = useBulkReassignClaims();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={() => setOpen(true)}>
         {label}
       </Button>
       <ReassignModal
         isOpen={open}
         onClose={() => setOpen(false)}
         title={label}
-        description="Every claim still awaiting the approver's decision (pending or awaiting the claimant's response) moves to the selected approver. Decided claims and claims already with Finance stay as they are."
+        description={`The ${claimIds.length} selected claim(s) move to the selected approver. If any of them can no longer be reassigned, none are moved.`}
         confirmLabel="Hand Over Claims"
         fromApproverId={fromApproverId}
         isSubmitting={bulk.isPending}
         submitError={bulk.error}
-        onSubmit={async (values) => {
+        onSubmit={async ({ toApproverId, reason }) => {
           try {
-            const result = await bulk.mutateAsync({ fromApproverId: values.fromApproverId, toApproverId: values.toApproverId, reason: values.reason });
-            toast.success(result.reassignedCount === 0 ? 'No open claims to hand over' : `${result.reassignedCount} claim(s) handed over`);
+            const result = await bulk.mutateAsync({ claimIds, toApproverId, reason });
+            toast.success(`${result.reassignedCount} claim(s) handed over`);
             setOpen(false);
+            onDone?.();
           } catch {
             // error rendered inline
           }

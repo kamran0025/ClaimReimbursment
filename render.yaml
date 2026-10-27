@@ -36,7 +36,7 @@ services:
       # "http://localhost:5173,https://your-frontend.onrender.com" — see
       # backend/.env.example and backend/src/lib/env.ts.
       - key: CORS_ORIGIN
-        value: http://localhost:5173
+        value: http://localhost:5173,https://expenseclaim1.netlify.app/
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN_SECONDS

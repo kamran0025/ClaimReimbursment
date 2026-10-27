@@ -14,6 +14,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useClaims, useActiveApprovers } from '@/features/claims/hooks/useClaims';
 import { useEmployees } from '@/features/finance/hooks/useFinance';
 import { BulkReassignAction } from '@/features/claims/components/ReassignApprover';
+import { SelectionBar } from '@/components/common/SelectionBar';
+import { canReassignClaim } from '@/services/api/stateMachine';
+import { useAuth } from '@/app/AuthContext';
 import { toClaimFilters } from '@/utils/toClaimFilters';
 import { formatDate, formatInr } from '@/utils/format';
 import { Role, ClaimStatus, CLAIM_STATUS_LABELS } from '@/types/enums';
@@ -27,7 +30,9 @@ const STATUS_OPTIONS = Object.values(ClaimStatus)
 export function AllClaimsPage() {
   const [filterValues, setFilterValues] = useState<ClaimFilterValues>({});
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const filters = toClaimFilters(filterValues);
   const { data, isLoading, isError, error, refetch } = useClaims(filters, { page, pageSize: 10 });
@@ -47,17 +52,14 @@ export function AllClaimsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="All Claims"
-        subtitle="Organization-wide claim visibility."
-        actions={<BulkReassignAction label="Reassign Approver's Claims" />}
-      />
+      <PageHeader title="All Claims" subtitle="Organization-wide claim visibility." />
 
       <ClaimFilterBar
         values={filterValues}
         onChange={(v) => {
           setFilterValues(v);
           setPage(1);
+          setSelected(new Set());
         }}
         claimantOptions={claimantOptions}
         approverOptions={approverOptions}
@@ -74,7 +76,19 @@ export function AllClaimsPage() {
         {data && data.items.length === 0 && <EmptyState title="No claims found" description="Try adjusting your filters." />}
         {data && data.items.length > 0 && (
           <>
-            <Table columns={columns} rows={data.items} rowKey={(c) => c.id} onRowClick={(c) => navigate(`/finance/claims/${c.id}`)} />
+            {selected.size > 0 && (
+              <SelectionBar count={selected.size} onClear={() => setSelected(new Set())}>
+                {/* The selection may span approvers, so no one is excluded from the target list. */}
+                <BulkReassignAction label="Change Approver" claimIds={[...selected]} fromApproverId={null} onDone={() => setSelected(new Set())} />
+              </SelectionBar>
+            )}
+            <Table
+              columns={columns}
+              rows={data.items}
+              rowKey={(c) => c.id}
+              onRowClick={(c) => navigate(`/finance/claims/${c.id}`)}
+              selection={user ? { selectedKeys: selected, onChange: setSelected, isRowSelectable: (c) => canReassignClaim(c, user) } : undefined}
+            />
             <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPageChange={setPage} />
           </>
         )}

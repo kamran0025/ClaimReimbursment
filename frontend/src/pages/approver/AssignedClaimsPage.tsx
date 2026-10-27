@@ -14,9 +14,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { useClaims } from '@/features/claims/hooks/useClaims';
 import { BulkReassignAction } from '@/features/claims/components/ReassignApprover';
+import { SelectionBar } from '@/components/common/SelectionBar';
 import { useAuth } from '@/app/AuthContext';
 import { toClaimFilters } from '@/utils/toClaimFilters';
-import { canDecideClaim } from '@/services/api/stateMachine';
+import { canDecideClaim, canReassignClaim } from '@/services/api/stateMachine';
 import { ClaimStatus } from '@/types/enums';
 import { formatDate, formatDateTime, formatInr } from '@/utils/format';
 import type { Claim } from '@/types/models';
@@ -64,6 +65,7 @@ export function AssignedClaimsPage() {
   const { user } = useAuth();
   const [filterValues, setFilterValues] = useState<ClaimFilterValues>({ status: ClaimStatus.PENDING_APPROVAL });
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const status = filterValues.status;
   const isDecidedView = status === ClaimStatus.APPROVED || status === ClaimStatus.REJECTED;
@@ -102,17 +104,14 @@ export function AssignedClaimsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="My Claims"
-        subtitle="Claims assigned to you."
-        actions={user && <BulkReassignAction fromApproverId={user.id} label="Hand Over My Claims" />}
-      />
+      <PageHeader title="My Claims" subtitle="Claims assigned to you." />
 
       <ClaimFilterBar
         values={filterValues}
         onChange={(v) => {
           setFilterValues(v);
           setPage(1);
+          setSelected(new Set());
         }}
         showSearch={false}
         statusOptions={STATUS_OPTIONS}
@@ -130,7 +129,27 @@ export function AssignedClaimsPage() {
         {data && data.items.length === 0 && <EmptyState title={emptyState.title} description={emptyState.description} />}
         {data && data.items.length > 0 && (
           <>
-            <Table columns={columns} rows={data.items} rowKey={(c) => c.id} onRowClick={(c) => navigate(`/approver/claims/${c.id}`)} />
+            {user && selected.size > 0 && (
+              <SelectionBar count={selected.size} onClear={() => setSelected(new Set())}>
+                <BulkReassignAction
+                  label="Change Approver"
+                  claimIds={[...selected]}
+                  fromApproverId={user.id}
+                  onDone={() => setSelected(new Set())}
+                />
+              </SelectionBar>
+            )}
+            <Table
+              columns={columns}
+              rows={data.items}
+              rowKey={(c) => c.id}
+              onRowClick={(c) => navigate(`/approver/claims/${c.id}`)}
+              selection={
+                isDecidedView || !user
+                  ? undefined
+                  : { selectedKeys: selected, onChange: setSelected, isRowSelectable: (c) => canReassignClaim(c, user) }
+              }
+            />
             <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPageChange={setPage} />
           </>
         )}
