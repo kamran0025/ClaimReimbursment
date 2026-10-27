@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { claimsApi, dashboardApi } from '@/services/api';
-import type { RespondToInfoRequestInput } from '@/services/api/claimsService';
+import type { BulkReassignClaimsInput, ReassignClaimInput, RespondToInfoRequestInput } from '@/services/api/claimsService';
 import { claimDetailKey } from './useClaims';
 
 function useInvalidateClaims() {
@@ -42,6 +42,22 @@ export function useRespondToInfoRequest(claimId: string) {
   return useMutation({
     mutationFn: (input: RespondToInfoRequestInput) => claimsApi.respondToInfoRequest(claimId, input),
     onSuccess: () => invalidate(claimId),
+  });
+}
+
+export function useReassignClaim(claimId: string) {
+  const invalidate = useInvalidateClaims();
+  return useMutation({
+    mutationFn: (input: ReassignClaimInput) => claimsApi.reassignClaim(claimId, input),
+    onSuccess: () => invalidate(claimId),
+  });
+}
+
+export function useBulkReassignClaims() {
+  const invalidate = useInvalidateClaims();
+  return useMutation({
+    mutationFn: (input: BulkReassignClaimsInput) => claimsApi.reassignClaimsBulk(input),
+    onSuccess: () => invalidate(),
   });
 }
 

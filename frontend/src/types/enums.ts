@@ -26,10 +26,14 @@ export const ClaimStatus = {
 } as const;
 export type ClaimStatus = (typeof ClaimStatus)[keyof typeof ClaimStatus];
 
-/** v2: a `ClaimMessage` is either an approver/Finance request for more info, or the claimant's reply. */
+/**
+ * v2: a `ClaimMessage` is either an approver/Finance request for more info, or the claimant's reply —
+ * or a sender-less system notice that the claim's approver was changed.
+ */
 export const ClaimMessageType = {
   INFO_REQUEST: 'INFO_REQUEST',
   RESPONSE: 'RESPONSE',
+  APPROVER_CHANGED: 'APPROVER_CHANGED',
 } as const;
 export type ClaimMessageType = (typeof ClaimMessageType)[keyof typeof ClaimMessageType];
 
@@ -53,6 +57,7 @@ export const AuditAction = {
   CLAIM_ESCALATED: 'CLAIM_ESCALATED',
   CLAIM_APPROVED: 'CLAIM_APPROVED',
   CLAIM_REJECTED: 'CLAIM_REJECTED',
+  CLAIM_REASSIGNED: 'CLAIM_REASSIGNED',
 } as const;
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
 

@@ -27,9 +27,17 @@ export function MessageThread({ messages }: { messages: ClaimMessage[] }) {
     <div className="h-full overflow-y-auto rounded-lg bg-slate-50 p-3 sm:p-4">
       <ol className="flex flex-col gap-4">
         {messages.map((m) => {
+          if (m.type === 'APPROVER_CHANGED') {
+            return (
+              <li key={m.id} className="flex flex-col items-center gap-0.5 text-center">
+                <span className="rounded-full bg-slate-200 px-3 py-1 text-xs text-slate-600">{m.message}</span>
+                <span className="text-[11px] text-slate-400">{formatDateTime(m.createdAt)}</span>
+              </li>
+            );
+          }
           const isRequest = m.type === 'INFO_REQUEST';
           const isMine = m.senderId === user?.id;
-          const name = m.sender?.name ?? m.senderId;
+          const name = m.sender?.name ?? m.senderId ?? 'System';
 
           return (
             <li key={m.id} className={clsx('flex items-end gap-2', isMine && 'flex-row-reverse')}>

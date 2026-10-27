@@ -13,6 +13,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useClaims, useActiveApprovers } from '@/features/claims/hooks/useClaims';
 import { useEmployees } from '@/features/finance/hooks/useFinance';
+import { BulkReassignAction } from '@/features/claims/components/ReassignApprover';
 import { toClaimFilters } from '@/utils/toClaimFilters';
 import { formatDate, formatInr } from '@/utils/format';
 import { Role, ClaimStatus, CLAIM_STATUS_LABELS } from '@/types/enums';
@@ -46,7 +47,11 @@ export function AllClaimsPage() {
 
   return (
     <div>
-      <PageHeader title="All Claims" subtitle="Organization-wide claim visibility." />
+      <PageHeader
+        title="All Claims"
+        subtitle="Organization-wide claim visibility."
+        actions={<BulkReassignAction label="Reassign Approver's Claims" />}
+      />
 
       <ClaimFilterBar
         values={filterValues}

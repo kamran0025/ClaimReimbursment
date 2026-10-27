@@ -18,6 +18,7 @@ const ACTION_LABELS: Record<string, string> = {
   CLAIM_ESCALATED: 'Approved by approver — sent to Finance for final approval',
   CLAIM_APPROVED: 'Claim approved',
   CLAIM_REJECTED: 'Claim rejected',
+  CLAIM_REASSIGNED: 'Approver changed',
 };
 
 export function AuditTrail({ logs, showClaimId }: { logs: AuditLog[]; showClaimId?: boolean }) {

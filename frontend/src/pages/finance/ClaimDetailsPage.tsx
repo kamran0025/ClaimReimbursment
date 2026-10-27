@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useClaim } from '@/features/claims/hooks/useClaims';
 import { ClaimDetailView } from '@/features/claims/components/ClaimDetailView';
 import { ClaimDecisionActions } from '@/features/claims/components/ClaimDecisionActions';
+import { ReassignClaimAction } from '@/features/claims/components/ReassignApprover';
 import { isInReview } from '@/services/api/stateMachine';
 
 /**
@@ -31,7 +32,12 @@ export function FinanceClaimDetailsPage() {
       <ClaimDetailView
         claim={claim}
         showClaimant
-        actions={<ClaimDecisionActions claim={claim} onDecided={() => navigate('/finance/claims')} />}
+        actions={
+          <>
+            <ReassignClaimAction claim={claim} />
+            <ClaimDecisionActions claim={claim} onDecided={() => navigate('/finance/claims')} />
+          </>
+        }
       />
     </div>
   );

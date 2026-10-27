@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useClaim } from '@/features/claims/hooks/useClaims';
 import { ClaimDetailView } from '@/features/claims/components/ClaimDetailView';
 import { ClaimDecisionActions } from '@/features/claims/components/ClaimDecisionActions';
+import { ReassignClaimAction } from '@/features/claims/components/ReassignApprover';
 import { useAuth } from '@/app/AuthContext';
 import { canDecideClaim, isAtFinanceStage } from '@/services/api/stateMachine';
 import { CLAIM_STATUS_LABELS } from '@/types/enums';
@@ -41,7 +42,13 @@ export function ClaimReviewPage() {
       <ClaimDetailView
         claim={claim}
         showClaimant
-        actions={<ClaimDecisionActions claim={claim} onDecided={() => navigate('/approver/claims')} />}
+        actions={
+          <>
+            {/* Handing the claim over removes it from this approver's scope, so leave the page. */}
+            <ReassignClaimAction claim={claim} onReassigned={() => navigate('/approver/claims')} />
+            <ClaimDecisionActions claim={claim} onDecided={() => navigate('/approver/claims')} />
+          </>
+        }
       />
     </div>
   );

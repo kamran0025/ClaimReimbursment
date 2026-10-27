@@ -42,3 +42,20 @@ export function canDecideClaim(
   if (user.role === Role.FINANCE) return true;
   return !isAtFinanceStage(claim) && claim.assignedApproverId === user.id;
 }
+
+/** Mirrors backend `isReassignable`: still with its approver — undecided and not yet signed off to Finance. */
+export function isReassignable(claim: { status: ClaimStatus; approverApprovedById: string | null }): boolean {
+  return (
+    (claim.status === ClaimStatus.PENDING_APPROVAL || claim.status === ClaimStatus.INFO_REQUESTED) &&
+    claim.approverApprovedById == null
+  );
+}
+
+/** Whether `user` may hand `claim` to a different approver: its assigned approver, or Finance. */
+export function canReassignClaim(
+  claim: { status: ClaimStatus; assignedApproverId: string | null; approverApprovedById: string | null },
+  user: { id: string; role: Role },
+): boolean {
+  if (!isReassignable(claim)) return false;
+  return user.role === Role.FINANCE || claim.assignedApproverId === user.id;
+}

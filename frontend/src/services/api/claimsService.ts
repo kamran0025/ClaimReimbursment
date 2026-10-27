@@ -174,3 +174,32 @@ export async function respondToInfoRequest(claimId: string, input: RespondToInfo
   }
   return normalizeClaimDetail(await apiPost<ClaimDetail>(`/claims/${claimId}/respond-info`, { message: input.message, attachedReceiptId }));
 }
+
+// ---------------------------------------------------------------------------
+// Approver delegation — the assigned approver or Finance hands claims to
+// another approver.
+// ---------------------------------------------------------------------------
+export interface ReassignClaimInput {
+  toApproverId: string;
+  reason?: string;
+}
+
+export async function reassignClaim(claimId: string, input: ReassignClaimInput): Promise<ClaimDetail> {
+  return normalizeClaimDetail(await apiPost<ClaimDetail>(`/claims/${claimId}/reassign`, input));
+}
+
+/** Either `claimIds`, or every open claim of `fromApproverId` (defaults to the calling approver). */
+export interface BulkReassignClaimsInput extends ReassignClaimInput {
+  claimIds?: string[];
+  fromApproverId?: string;
+}
+
+export interface BulkReassignResult {
+  reassignedCount: number;
+  claimIds: string[];
+  toApproverId: string;
+}
+
+export async function reassignClaimsBulk(input: BulkReassignClaimsInput): Promise<BulkReassignResult> {
+  return apiPost<BulkReassignResult>('/claims/reassign', input);
+}

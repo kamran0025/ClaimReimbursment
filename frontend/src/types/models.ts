@@ -52,7 +52,8 @@ export interface Receipt {
 export interface ClaimMessage {
   id: string;
   claimId: string;
-  senderId: string;
+  /** Null for system notices (`APPROVER_CHANGED`). */
+  senderId: string | null;
   type: ClaimMessageType;
   message: string;
   attachedReceiptId: string | null;

@@ -13,6 +13,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { useClaims } from '@/features/claims/hooks/useClaims';
+import { BulkReassignAction } from '@/features/claims/components/ReassignApprover';
 import { useAuth } from '@/app/AuthContext';
 import { toClaimFilters } from '@/utils/toClaimFilters';
 import { canDecideClaim } from '@/services/api/stateMachine';
@@ -101,7 +102,11 @@ export function AssignedClaimsPage() {
 
   return (
     <div>
-      <PageHeader title="My Claims" subtitle="Claims assigned to you." />
+      <PageHeader
+        title="My Claims"
+        subtitle="Claims assigned to you."
+        actions={user && <BulkReassignAction fromApproverId={user.id} label="Hand Over My Claims" />}
+      />
 
       <ClaimFilterBar
         values={filterValues}
