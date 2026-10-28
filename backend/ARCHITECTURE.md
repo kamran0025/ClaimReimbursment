@@ -65,6 +65,31 @@ client-supplied name, so path traversal via a crafted filename is
 structurally impossible). Swapping to S3 later means writing one new class
 against the same interface — no caller changes.
 
+## Approval reminders
+
+`jobs/scheduler.ts` (started from `server.ts` only, so tests never start
+timers) runs `runApprovalReminders()` in-process with `croner` on
+`REMINDER_CRON` (default daily 10:00 `Asia/Kolkata`). A claim waiting
+`REMINDER_FIRST_AFTER_DAYS` (2) since `Claim.assignedAt` gets a reminder,
+then one every `REMINDER_REPEAT_EVERY_DAYS` (1) until it leaves the queue:
+`PENDING_APPROVAL` → the assigned approver (or Finance if that approver is
+inactive), `PENDING_FINANCE_APPROVAL` → every active Finance user.
+`INFO_REQUESTED` waits on the claimant and is never reminded. Each recipient
+gets one digest per run, and each reminded claim gets a system
+`APPROVAL_REMINDER_SENT` audit row (`actorId: null`).
+
+Every mutation that hands a claim to a reviewer spreads `startReviewClock()`
+into its update. A claim is claimed for a run with a conditional
+`updateMany` on its reminder state *before* any email goes out. That makes
+concurrent runs (two instances, or the manual
+`POST /finance/reminders/run`) safe. If every email for a group fails, the
+claim is released so the next run retries.
+
+Email goes through the `Notifier` interface (`services/notifier/`), like
+`Storage`: `EmailJsNotifier` (`@emailjs/nodejs`, filling a
+dashboard-managed template) when all `EMAILJS_*` vars are set, otherwise
+`ConsoleNotifier` just logs the message (dev/tests).
+
 ## Deviations from `plan-backend.md`
 
 - **Reimbursement dropped entirely.** The frontend this backend serves

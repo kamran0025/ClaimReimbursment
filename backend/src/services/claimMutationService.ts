@@ -24,6 +24,7 @@ import {
 import { recalculateClaimTotal } from './claimTotalService';
 import { recordAudit } from './auditLogService';
 import { resolveApprover } from './approverAssignmentService';
+import { startReviewClock } from './approvalReminderService';
 import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
 import { storage } from './storage';
 import type { CreateClaimInput, UpdateClaimInput, ClaimItemInput, RespondInfoInput } from '../validation/claimValidation';
@@ -209,6 +210,7 @@ async function runSubmission(user: ScopeUser, claimId: string, isResubmit: boole
         approverApprovedAt: null,
         submissionCycle: nextCycle,
         submittedAt: new Date(),
+        ...startReviewClock(),
         rejectionReason: null,
         rejectedById: null,
         rejectedAt: null,
@@ -278,7 +280,12 @@ export async function approveClaim(user: { id: string; role: Role }, claimId: st
     if (escalate) {
       await tx.claim.update({
         where: { id: claimId },
-        data: { status: ClaimStatus.PENDING_FINANCE_APPROVAL, approverApprovedById: user.id, approverApprovedAt: new Date() },
+        data: {
+          status: ClaimStatus.PENDING_FINANCE_APPROVAL,
+          approverApprovedById: user.id,
+          approverApprovedAt: new Date(),
+          ...startReviewClock(),
+        },
       });
       await recordAudit(tx, {
         claimId,
@@ -385,7 +392,8 @@ export async function respondToInfoRequest(user: ScopeUser, claimId: string, inp
     if (claim.status === ClaimStatus.INFO_REQUESTED) {
       newStatus = isAtFinanceStage(claim) ? ClaimStatus.PENDING_FINANCE_APPROVAL : ClaimStatus.PENDING_APPROVAL;
     }
-    await tx.claim.update({ where: { id: claimId }, data: { status: newStatus } });
+    const backInQueue = newStatus !== claim.status;
+    await tx.claim.update({ where: { id: claimId }, data: { status: newStatus, ...(backInQueue ? startReviewClock() : {}) } });
     await tx.claimMessage.create({
       data: { claimId, senderId: user.id, type: ClaimMessageType.RESPONSE, message: input.message.trim(), attachedReceiptId },
     });

@@ -19,11 +19,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@emailjs/nodejs": "^5.0.2",
     "@prisma/client": "6.19.3",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "croner": "^11.0.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",

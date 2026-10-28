@@ -30,11 +30,14 @@ export async function recordAudit(tx: Prisma.TransactionClient, input: RecordAud
 /**
  * A claimant only learns that their approver changed (from the APPROVER_CHANGED
  * message), never who moved the claim, to whom or why — so reassignment rows
- * are left out of their view of the trail.
+ * are left out of their view of the trail. Approval reminders are internal
+ * nudges to reviewers and are hidden from claimants too.
  */
+const HIDDEN_FROM_CLAIMANT: AuditAction[] = ['CLAIM_REASSIGNED', 'APPROVAL_REMINDER_SENT'];
+
 export async function listAuditForClaim(claimId: string, viewerRole: Role) {
   const logs = await prisma.auditLog.findMany({
-    where: { claimId, ...(viewerRole === Role.CLAIMANT ? { action: { not: 'CLAIM_REASSIGNED' as const } } : {}) },
+    where: { claimId, ...(viewerRole === Role.CLAIMANT ? { action: { notIn: HIDDEN_FROM_CLAIMANT } } : {}) },
     include: { actor: true },
     orderBy: { createdAt: 'asc' },
   });

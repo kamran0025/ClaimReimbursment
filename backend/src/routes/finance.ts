@@ -4,6 +4,8 @@ import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
 import { asyncHandler } from '../utils/asyncHandler';
 import { streamClaimsCsv, exportFilename } from '../services/exportService';
+import { runApprovalReminders } from '../services/approvalReminderService';
+import { ok } from '../types/api';
 
 export const financeRouter = Router();
 
@@ -25,5 +27,14 @@ financeRouter.get(
       res.write(`${line}\n`);
     }
     res.end();
+  }),
+);
+
+// Runs the approval-reminder job now instead of waiting for the schedule.
+// Safe to call repeatedly: claims already reminded in the current window are skipped.
+financeRouter.post(
+  '/reminders/run',
+  asyncHandler(async (_req, res) => {
+    res.json(ok(await runApprovalReminders()));
   }),
 );

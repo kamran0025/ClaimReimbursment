@@ -127,7 +127,7 @@ the `APPROVER_CHANGED` message is all they get.
 
 | Method & Path | Auth | Notes |
 |---|---|---|
-| `GET /audit/claims/:claimId` | scoped (same as claim detail) | Full audit trail for one claim, oldest first. `CLAIM_REASSIGNED` rows are omitted for claimants. |
+| `GET /audit/claims/:claimId` | scoped (same as claim detail) | Full audit trail for one claim, oldest first. `CLAIM_REASSIGNED` and `APPROVAL_REMINDER_SENT` rows are omitted for claimants. |
 | `GET /audit` | `FINANCE` | Global, paginated. Query: `claimId?`, `action?`, `page?`, `pageSize?`. *(Not in the original plan's endpoint list — added because the frontend's Finance "Audit Logs" page calls `listAllAudit`.)* |
 
 ## Finance
@@ -135,6 +135,7 @@ the `APPROVER_CHANGED` message is all they get.
 | Method & Path | Auth | Query |
 |---|---|---|
 | `GET /finance/export` | `FINANCE` | `dateFrom?`, `dateTo?`, `status?` (repeatable) | Streams `text/csv`, DB-filtered and pulled in bounded batches (never the whole `Claim` table in memory at once). |
+| `POST /finance/reminders/run` | `FINANCE` | — | Runs the approval-reminder job now (it otherwise runs on `REMINDER_CRON`). Returns `{ claimsReminded, emailsSent, emailsFailed }`. Claims already reminded in the current window are skipped, so repeated calls don't re-send. |
 
 ## Dashboards
 

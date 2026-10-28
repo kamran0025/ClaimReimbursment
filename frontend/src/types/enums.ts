@@ -58,6 +58,7 @@ export const AuditAction = {
   CLAIM_APPROVED: 'CLAIM_APPROVED',
   CLAIM_REJECTED: 'CLAIM_REJECTED',
   CLAIM_REASSIGNED: 'CLAIM_REASSIGNED',
+  APPROVAL_REMINDER_SENT: 'APPROVAL_REMINDER_SENT',
 } as const;
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
 

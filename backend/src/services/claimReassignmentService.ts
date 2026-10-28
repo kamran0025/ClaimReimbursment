@@ -14,6 +14,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError, ErrorCode } from './errors';
 import { assertReassignable } from './claimStateMachine';
 import { recordAudit } from './auditLogService';
+import { startReviewClock } from './approvalReminderService';
 import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
 import type { ScopeUser } from './claimScope';
 import type { BulkReassignClaimsInput, ReassignClaimInput } from '../validation/claimValidation';
@@ -47,7 +48,7 @@ async function reassignOne(
   // silently overwriting it.
   const { count } = await tx.claim.updateMany({
     where: { id: claim.id, status: claim.status, assignedApproverId: claim.assignedApproverId, approverApprovedById: null },
-    data: { assignedApproverId: input.toApproverId },
+    data: { assignedApproverId: input.toApproverId, ...startReviewClock() },
   });
   if (count === 0) {
     throw new ApiError(ErrorCode.CLAIM_NOT_REASSIGNABLE, 'This claim changed while it was being reassigned. Refresh and try again.', { claimId: claim.id });

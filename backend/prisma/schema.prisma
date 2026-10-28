@@ -54,6 +54,7 @@ enum AuditAction {
   CLAIM_APPROVED
   CLAIM_REJECTED
   CLAIM_REASSIGNED
+  APPROVAL_REMINDER_SENT
 }
 
 model User {
@@ -97,6 +98,13 @@ model Claim {
   rejectedAt           DateTime?
   submittedAt          DateTime?
   submissionCycle      Int         @default(1)
+  // When the claim last landed in its current reviewer's queue: (re)submit,
+  // reassignment, escalation to Finance, or the claimant answering an info
+  // request. The approval-reminder job measures "waiting since" from here.
+  assignedAt           DateTime?
+  // Reminder bookkeeping; both reset whenever assignedAt does.
+  lastRemindedAt       DateTime?
+  reminderCount        Int         @default(0)
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 
@@ -114,6 +122,7 @@ model Claim {
   @@index([status])
   @@index([assignedApproverId])
   @@index([createdAt])
+  @@index([status, assignedAt])
 }
 
 model ClaimItem {

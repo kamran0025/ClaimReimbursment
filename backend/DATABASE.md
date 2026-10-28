@@ -8,7 +8,7 @@ so far: `prisma/migrations/20260921064744_init`.
 | Model | Purpose |
 |---|---|
 | `User` | All three roles (`FINANCE`, `APPROVER`, `CLAIMANT`) in one table, distinguished by `role`. `isActive` soft-disables a login without deleting history. |
-| `Claim` | One row per claim. `total` is derived/cached (§ below) — never client-writable. `assignedApproverId` is null until first submit. `decidedById`/`decidedAt` record whoever (the assigned approver, or any Finance user) resolved the current submission cycle. `submissionCycle` increments on each resubmit; nothing is deleted on rejection/resubmit, so cycle history stays queryable via `AuditLog`. |
+| `Claim` | One row per claim. `total` is derived/cached (§ below) — never client-writable. `assignedApproverId` is null until first submit. `decidedById`/`decidedAt` record whoever (the assigned approver, or any Finance user) resolved the current submission cycle. `submissionCycle` increments on each resubmit; nothing is deleted on rejection/resubmit, so cycle history stays queryable via `AuditLog`. `assignedAt` is when the claim last landed in its current reviewer's queue (submit/resubmit, reassignment, escalation to Finance, or the claimant answering an info request); `lastRemindedAt`/`reminderCount` are the approval-reminder job's bookkeeping and reset with it. All three are server-owned and not serialized. |
 | `ClaimItem` | Line items. `amount` is `Decimal(10,2)` — never a float — to avoid rounding drift across repeated add/edit/delete cycles. |
 | `Receipt` | One row per uploaded file. `storagePath` is an opaque key into the `Storage` abstraction (a random filename on local disk today), never the client-supplied filename. `claimItemId` is nullable — a receipt can be tied to a specific line item or stand alone (e.g. an info-request attachment). |
 | `ClaimMessage` | The info-request/response thread. `type` distinguishes an approver/Finance question (`INFO_REQUEST`) from a claimant reply (`RESPONSE`), plus `APPROVER_CHANGED` — a system notice with `senderId` null, written when a claim is reassigned. `attachedReceiptId` optionally points at a `Receipt` uploaded alongside a response. |
@@ -47,7 +47,7 @@ write path:
 ## Indexes
 
 `Claim.claimantId`, `Claim.status`, `Claim.assignedApproverId`,
-`Claim.createdAt`, `ClaimItem.claimId`, `Receipt.claimId`,
+`Claim.createdAt`, `Claim(status, assignedAt)` (reminder scan), `ClaimItem.claimId`, `Receipt.claimId`,
 `Receipt.claimItemId`, `ClaimMessage.claimId`, `AuditLog.claimId`,
 `User.role`. Unique: `User.email`.
 

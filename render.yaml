@@ -54,6 +54,22 @@ services:
       # Receipt storage — the free plan's disk is wiped on every restart,
       # so receipts go to Cloudinary. `sync: false` = enter the values in
       # the Render dashboard (Environment tab); they're never committed.
+      # Approval reminders (see backend/.env.example). Emails are only logged
+      # until the EMAILJS_* values are set in the dashboard.
+      - key: APP_URL
+        value: https://expenseclaim1.netlify.app
+      - key: REMINDER_FIRST_AFTER_DAYS
+        value: '2'
+      - key: REMINDER_REPEAT_EVERY_DAYS
+        value: '1'
+      - key: EMAILJS_SERVICE_ID
+        sync: false
+      - key: EMAILJS_TEMPLATE_ID
+        sync: false
+      - key: EMAILJS_PUBLIC_KEY
+        sync: false
+      - key: EMAILJS_PRIVATE_KEY
+        sync: false
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

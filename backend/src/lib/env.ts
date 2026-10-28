@@ -39,11 +39,43 @@ function parseThreshold(raw: string | undefined): number {
   return value;
 }
 
+// EmailJS for outgoing email (approval reminders). All four together, or
+// none → emails are only logged (ConsoleNotifier), which dev and tests use.
+function parseEmailJs() {
+  const serviceId = process.env.EMAILJS_SERVICE_ID;
+  const templateId = process.env.EMAILJS_TEMPLATE_ID;
+  const publicKey = process.env.EMAILJS_PUBLIC_KEY;
+  const privateKey = process.env.EMAILJS_PRIVATE_KEY;
+  if (!serviceId && !templateId && !publicKey && !privateKey) return null;
+  if (!serviceId || !templateId || !publicKey || !privateKey) {
+    throw new Error('EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY and EMAILJS_PRIVATE_KEY must all be set (or none)');
+  }
+  return { serviceId, templateId, publicKey, privateKey };
+}
+
+function parsePositiveNumber(name: string, fallback: number): number {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be a positive number`);
+  return value;
+}
+
+function parseReminders() {
+  return {
+    enabled: process.env.REMINDERS_ENABLED !== 'false',
+    cron: process.env.REMINDER_CRON ?? '0 10 * * *',
+    timezone: process.env.REMINDER_TIMEZONE ?? 'Asia/Kolkata',
+    firstAfterDays: parsePositiveNumber('REMINDER_FIRST_AFTER_DAYS', 2),
+    repeatEveryDays: parsePositiveNumber('REMINDER_REPEAT_EVERY_DAYS', 1),
+  };
+}
+
+const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: required('DATABASE_URL'),
-  corsOrigins: parseCorsOrigins(process.env.CORS_ORIGIN),
+  corsOrigins,
   jwtSecret: required('JWT_SECRET'),
   jwtExpiresInSeconds: Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 86400),
   bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
@@ -54,4 +86,9 @@ export const env = {
   // Claims with a total strictly above this (INR) need Finance sign-off after
   // the assigned approver approves — see claimStateMachine.ts.
   financeApprovalThreshold: parseThreshold(process.env.FINANCE_APPROVAL_THRESHOLD),
+  // Frontend base URL used for links in emails; defaults to the first CORS origin.
+  appUrl: (process.env.APP_URL ?? corsOrigins[0]).replace(/\/+$/, ''),
+  emailjs: parseEmailJs(),
+  // Approval reminders — see services/approvalReminderService.ts.
+  reminders: parseReminders(),
 };

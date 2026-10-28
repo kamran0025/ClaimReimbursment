@@ -19,6 +19,7 @@ const ACTION_LABELS: Record<string, string> = {
   CLAIM_APPROVED: 'Claim approved',
   CLAIM_REJECTED: 'Claim rejected',
   CLAIM_REASSIGNED: 'Approver changed',
+  APPROVAL_REMINDER_SENT: 'Reminder sent to reviewer',
 };
 
 export function AuditTrail({ logs, showClaimId }: { logs: AuditLog[]; showClaimId?: boolean }) {
