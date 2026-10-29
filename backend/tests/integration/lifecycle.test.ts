@@ -24,7 +24,7 @@ describe('claim lifecycle — happy path', () => {
 
     const withItem = await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Cab fare',
       amount: 500,
     });
@@ -53,7 +53,7 @@ describe('claim lifecycle — happy path', () => {
     const claimId = created.body.data.id;
     await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Flight',
       amount: 8000,
     });
@@ -69,7 +69,7 @@ describe('claim lifecycle — happy path', () => {
     const items = infoRequested.body.data.items;
     const blockedEdit = await claimant.patch(`/claims/${claimId}/items/${items[0].id}`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Flight (edited)',
       amount: 9000,
     });
@@ -94,7 +94,7 @@ describe('claim lifecycle — happy path', () => {
     const claimId = created.body.data.id;
     await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Meals',
+      categoryId: users.categories.meals.id,
       description: 'Lunch',
       amount: 1200,
     });
@@ -130,7 +130,7 @@ describe('claim lifecycle — happy path', () => {
     const claimId = created.body.data.id;
     await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Accommodation',
+      categoryId: users.categories.lodging.id,
       description: 'Hotel',
       amount: 3000,
     });

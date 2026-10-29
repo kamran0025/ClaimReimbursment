@@ -8,6 +8,7 @@ import { claimsRouter } from './routes/claims';
 import { auditRouter } from './routes/audit';
 import { financeRouter } from './routes/finance';
 import { dashboardsRouter } from './routes/dashboards';
+import { categoriesRouter } from './routes/categories';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 
@@ -44,6 +45,7 @@ export function createApp() {
   app.use('/audit', auditRouter);
   app.use('/finance', financeRouter);
   app.use('/dashboards', dashboardsRouter);
+  app.use('/categories', categoriesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

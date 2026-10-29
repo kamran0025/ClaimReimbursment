@@ -6,9 +6,9 @@
 // the frontend (plan-backend.md §6: "must never be relied upon").
 import { ClaimStatus, Role } from '@/types/enums';
 
-/** Claimant may edit title/items only while the claim is in one of these states. */
+/** Claimant may edit title/items only while the claim is in one of these states (PENDING_APPROVAL: until the approver acts). */
 export function isEditableStatus(status: ClaimStatus): boolean {
-  return status === ClaimStatus.DRAFT || status === ClaimStatus.REJECTED;
+  return status === ClaimStatus.DRAFT || status === ClaimStatus.REJECTED || status === ClaimStatus.PENDING_APPROVAL;
 }
 
 /**

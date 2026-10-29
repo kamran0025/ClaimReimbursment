@@ -21,7 +21,7 @@ async function createSubmittedClaim(claimantId: string, amount = 1000) {
   const claimId = created.body.data.id;
   await claimant.post(`/claims/${claimId}/items`).send({
     expenseDate: new Date().toISOString().slice(0, 10),
-    category: 'Travel',
+    categoryId: users.categories.travel.id,
     description: 'Test item',
     amount,
   });
@@ -83,7 +83,7 @@ describe('security & data-integrity', () => {
     const claimId = created.body.data.id;
     await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Item',
       amount: 100,
     });
@@ -109,7 +109,7 @@ describe('security & data-integrity', () => {
 
     const withItem = await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Item',
       amount: 250,
     });
@@ -138,7 +138,7 @@ describe('security & data-integrity', () => {
 
     const zero = await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Item',
       amount: 0,
     });
@@ -146,7 +146,7 @@ describe('security & data-integrity', () => {
 
     const negative = await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'Item',
       amount: -50,
     });
@@ -176,7 +176,7 @@ describe('security & data-integrity', () => {
     const claimant = agentAs(users.claimantA.id);
     const addItemRes = await claimant.post(`/claims/${claimId}/items`).send({
       expenseDate: new Date().toISOString().slice(0, 10),
-      category: 'Travel',
+      categoryId: users.categories.travel.id,
       description: 'New item',
       amount: 100,
     });

@@ -2,14 +2,14 @@
 // validated server-side (mime + size), written through the `Storage`
 // abstraction, and read back only via an authenticated, scoped download —
 // never served as static files.
-import { ClaimStatus } from '@prisma/client';
+import { ClaimStatus, type Claim } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { env } from '../lib/env';
 import { ApiError, ErrorCode } from './errors';
 import { assertClaimInScope, assertOwner, type ScopeUser } from './claimScope';
 import { assertEditable } from './claimStateMachine';
 import { recordAudit } from './auditLogService';
-import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
+import { buildClaimDetail, findClaimForUpdate, loadClaimForMutation } from './claimQueryService';
 import { isAllowedReceiptMimeType } from './receiptRules';
 import { storage } from './storage';
 import { logger } from '../lib/logger';
@@ -32,22 +32,37 @@ function validateReceiptFile(file: UploadedFile): void {
   }
 }
 
-export async function addReceipt(user: ScopeUser, claimId: string, file: UploadedFile, claimItemId: string | null) {
-  validateReceiptFile(file);
-
-  const claim = await prisma.claim.findUnique({ where: { id: claimId } });
-  if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
-  assertOwner(user, claim);
-
+/**
+ * While INFO_REQUESTED, existing line items are locked — only a new,
+ * unattached "additional evidence" receipt may be added or removed
+ * (plan-backend.md §5). Otherwise the claim must be editable.
+ */
+function assertReceiptChangeAllowed(claim: Pick<Claim, 'status'>, claimItemId: string | null) {
   if (claim.status === ClaimStatus.INFO_REQUESTED) {
-    // While INFO_REQUESTED, existing line items are locked — only a new,
-    // unattached "additional evidence" receipt may be added (plan-backend.md §5).
     if (claimItemId) {
       throw new ApiError(ErrorCode.CLAIM_NOT_EDITABLE, 'Existing line items cannot be changed while responding to an info request.');
     }
   } else {
     assertEditable(claim);
   }
+}
+
+/** Re-checks under the claim's row lock: a PENDING_APPROVAL claim may have been decided since the first check. */
+async function recheckUnderLock(tx: Parameters<typeof findClaimForUpdate>[0], claimId: string, claimItemId: string | null) {
+  const locked = await findClaimForUpdate(tx, claimId);
+  if (!locked) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
+  assertReceiptChangeAllowed(locked, claimItemId);
+  return locked;
+}
+
+export async function addReceipt(user: ScopeUser, claimId: string, file: UploadedFile, claimItemId: string | null) {
+  validateReceiptFile(file);
+
+  const claim = await prisma.claim.findUnique({ where: { id: claimId } });
+  if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
+  assertOwner(user, claim);
+  // Checked before storing the file (cheap rejection), and again under the lock below.
+  assertReceiptChangeAllowed(claim, claimItemId);
 
   if (claimItemId) {
     const item = await prisma.claimItem.findFirst({ where: { id: claimItemId, claimId } });
@@ -59,6 +74,7 @@ export async function addReceipt(user: ScopeUser, claimId: string, file: Uploade
   const stored = await storage.save(file.buffer, file.originalname);
   try {
     await prisma.$transaction(async (tx) => {
+      const locked = await recheckUnderLock(tx, claimId, claimItemId);
       const receipt = await tx.receipt.create({
         data: {
           claimId,
@@ -74,8 +90,8 @@ export async function addReceipt(user: ScopeUser, claimId: string, file: Uploade
         claimId,
         actorId: user.id,
         action: 'RECEIPT_UPLOADED',
-        oldStatus: claim.status,
-        newStatus: claim.status,
+        oldStatus: locked.status,
+        newStatus: locked.status,
         metadata: { fileName: receipt.fileName, claimItemId },
       });
     });
@@ -97,22 +113,17 @@ export async function deleteReceipt(user: ScopeUser, claimId: string, receiptId:
   const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, claimId } });
   if (!receipt) throw new ApiError(ErrorCode.RECEIPT_NOT_FOUND, 'Receipt not found.');
 
-  if (claim.status === ClaimStatus.INFO_REQUESTED) {
-    if (receipt.claimItemId) {
-      throw new ApiError(ErrorCode.CLAIM_NOT_EDITABLE, 'Existing line items cannot be changed while responding to an info request.');
-    }
-  } else {
-    assertEditable(claim);
-  }
+  assertReceiptChangeAllowed(claim, receipt.claimItemId);
 
   await prisma.$transaction(async (tx) => {
+    const locked = await recheckUnderLock(tx, claimId, receipt.claimItemId);
     await tx.receipt.delete({ where: { id: receiptId } });
     await recordAudit(tx, {
       claimId,
       actorId: user.id,
       action: 'RECEIPT_DELETED',
-      oldStatus: claim.status,
-      newStatus: claim.status,
+      oldStatus: locked.status,
+      newStatus: locked.status,
       metadata: { receiptId },
     });
   });

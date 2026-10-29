@@ -41,7 +41,7 @@ the contract the frontend's mock layer was built against).
 | `GET /claims` | any | query: `status`, `claimantId`, `assignedApproverId`, `decidedById`, `dateFrom`, `dateTo`, `amountMin`, `amountMax`, `search`, `page`, `pageSize` | Scoped per role (see `AUTHORIZATION.md`). Returns `Paginated<Claim>`. |
 | `POST /claims` | `CLAIMANT` | `{ title }` | Creates a `DRAFT`. |
 | `GET /claims/:id` | scoped | — | Returns `ClaimDetail` (`Claim` + `items`, `receipts`, `messages`). |
-| `PATCH /claims/:id` | owner | `{ title? }` | Only while `DRAFT`/`REJECTED`. |
+| `PATCH /claims/:id` | owner | `{ title? }` | Only while editable: `DRAFT`, `REJECTED`, or `PENDING_APPROVAL` (see Line items). |
 | `POST /claims/:id/submit` | owner | `{ assignedApproverId }` | `DRAFT`/`REJECTED` → `PENDING_APPROVAL`. Requires ≥1 item, all positive amounts, a valid active approver. |
 | `POST /claims/:id/resubmit` | owner | `{ assignedApproverId }` | Same guards as submit; only legal from `REJECTED`. Bumps `submissionCycle`, may reassign approver. |
 | `POST /claims/:id/cancel` | owner | — | Legal from `DRAFT`, or `PENDING_APPROVAL` before a decision. |
@@ -50,19 +50,40 @@ the contract the frontend's mock layer was built against).
 
 | Method & Path | Auth | Body |
 |---|---|---|
-| `POST /claims/:id/items` | owner, claim editable | `{ expenseDate, category, description, amount, merchant? }` |
+| `POST /claims/:id/items` | owner, claim editable | `{ expenseDate, categoryId, description, amount, merchant? }` |
 | `PATCH /claims/:id/items/:itemId` | owner, claim editable | same shape |
 | `DELETE /claims/:id/items/:itemId` | owner, claim editable | — |
 
+"Claim editable" = `DRAFT`, `REJECTED`, or `PENDING_APPROVAL`. While
+`PENDING_APPROVAL` (until the approver acts) the claimant edits in place —
+the claim stays in the approver's queue and nothing is resubmitted — but
+can't delete its last item (`409 CLAIM_EMPTY_ITEMS`). Edits and decisions
+take the claim's row lock, so an approval never runs against a total that's
+changing underneath it. From `PENDING_FINANCE_APPROVAL`, `INFO_REQUESTED`,
+`APPROVED` and `CANCELLED` the claim is locked (`409 CLAIM_NOT_EDITABLE`).
+
 All three return the updated `ClaimDetail` with `total` freshly
 recalculated server-side. `amount` must be `> 0`; `expenseDate` must parse
-and not be more than 24h in the future.
+and not be more than 24h in the future. `categoryId` must be an existing
+category (`400 VALIDATION_ERROR`, `details.field = 'categoryId'` otherwise).
+Items are returned with both `categoryId` and `category` (the category's
+current name), plus `categoryLimit` and `isOverLimit`.
+
+**Category limits (warn, don't block).** An item whose `amount` is above
+its category's `maxAmount` is still saved; it's returned with
+`isOverLimit: true` and flagged in the UI for the approver/Finance (the
+claimant explains why in `description`). `categoryLimit` is the limit the
+item was checked against: set on every item save, and updated when Finance
+changes `maxAmount` while the claim is still `DRAFT`/`REJECTED`. Once the
+claim is submitted a limit change no longer moves its flags (an item the
+claimant edits while `PENDING_APPROVAL` is re-checked like any save). `ITEM_ADDED`/`ITEM_UPDATED` audit metadata includes
+`overLimit`.
 
 ### Receipts
 
 | Method & Path | Auth | Notes |
 |---|---|---|
-| `POST /claims/:id/receipts` | owner | `multipart/form-data`, field `file` (image/jpeg, image/png, image/webp, or application/pdf; ≤5MB), optional field `claimItemId`. Legal while `DRAFT`/`REJECTED` (any `claimItemId`), or `INFO_REQUESTED` with **no** `claimItemId` (existing items stay locked). |
+| `POST /claims/:id/receipts` | owner | `multipart/form-data`, field `file` (image/jpeg, image/png, image/webp, or application/pdf; ≤5MB), optional field `claimItemId`. Legal while the claim is editable (`DRAFT`/`REJECTED`/`PENDING_APPROVAL`, any `claimItemId`), or `INFO_REQUESTED` with **no** `claimItemId` (existing items stay locked). |
 | `GET /claims/:id/receipts/:receiptId` | scoped (owner, assigned approver, or Finance) | Streams the file with its original `Content-Type` and `Content-Disposition: attachment`. Never served as a static file. |
 | `DELETE /claims/:id/receipts/:receiptId` | owner | Same editability rule as upload. *(Not in the original plan's endpoint list — added to match the frontend's `EditClaimPage`, which does call this.)* |
 
@@ -122,6 +143,20 @@ the `APPROVER_CHANGED` message is all they get.
 > `respondToInfoRequest` needs to orchestrate both calls in sequence; the
 > exported function signature and resulting `ClaimDetail` shape don't
 > change.
+
+## Expense categories
+
+Finance-managed list of line-item categories, each with a per-item
+spending limit `maxAmount` (INR; over-limit items are flagged, not blocked —
+see Line items). Names are
+unique case-insensitively (`409 CATEGORY_NAME_TAKEN`).
+
+| Method & Path | Auth | Body | Notes |
+|---|---|---|---|
+| `GET /categories` | any | — | Returns `ExpenseCategory[]` (`{ id, name, maxAmount, createdAt, updatedAt }`) sorted by name. `maxAmount` is `null` for categories created before limits existed. |
+| `POST /categories` | `FINANCE` | `{ name, maxAmount }` | `201`. `maxAmount` must be `> 0`. |
+| `PATCH /categories/:id` | `FINANCE` | `{ name?, maxAmount? }` (at least one) | A rename shows on every existing item. A new `maxAmount` re-checks items on `DRAFT`/`REJECTED` claims only. `404 CATEGORY_NOT_FOUND`. |
+| `DELETE /categories/:id` | `FINANCE` | — | Returns `{ id }`. `409 CATEGORY_IN_USE` (`details.itemCount`) while any line item uses it. |
 
 ## Audit
 

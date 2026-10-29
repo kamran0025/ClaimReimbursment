@@ -22,7 +22,7 @@ async function submitClaimFor(amount: number): Promise<{ claimId: string; approv
   const claimId = created.body.data.id;
   await claimant.post(`/claims/${claimId}/items`).send({
     expenseDate: new Date().toISOString().slice(0, 10),
-    category: 'Travel',
+    categoryId: users.categories.travel.id,
     description: 'Team travel',
     amount,
   });

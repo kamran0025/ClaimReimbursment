@@ -19,11 +19,25 @@ export interface User {
   updatedAt: string;
 }
 
+/** Finance-managed. Can only be deleted while no line item uses it. */
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  maxAmount: number | null; // INR limit; null for categories created before limits existed
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ClaimItem {
   id: string;
   claimId: string;
   expenseDate: string; // ISO date
-  category: string;
+  categoryId: string;
+  category: string; // the category's current name
+  /** The category limit this item was checked against (frozen once the claim is in review); null = no limit. */
+  categoryLimit: number | null;
+  /** Over-limit items are accepted but flagged for the approver. */
+  isOverLimit: boolean;
   description: string;
   amount: number;
   merchant?: string;

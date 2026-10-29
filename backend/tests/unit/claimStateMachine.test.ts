@@ -15,21 +15,25 @@ import {
 import { ApiError, ErrorCode } from '../../src/services/errors';
 
 describe('claimStateMachine', () => {
-  it('DRAFT and REJECTED are the only editable statuses', () => {
-    expect(isEditableStatus(ClaimStatus.DRAFT)).toBe(true);
-    expect(isEditableStatus(ClaimStatus.REJECTED)).toBe(true);
-    for (const s of [ClaimStatus.PENDING_APPROVAL, ClaimStatus.PENDING_FINANCE_APPROVAL, ClaimStatus.INFO_REQUESTED, ClaimStatus.APPROVED, ClaimStatus.CANCELLED]) {
+  it('DRAFT, REJECTED and PENDING_APPROVAL are the only editable statuses', () => {
+    for (const s of [ClaimStatus.DRAFT, ClaimStatus.REJECTED, ClaimStatus.PENDING_APPROVAL]) {
+      expect(isEditableStatus(s)).toBe(true);
+    }
+    for (const s of [ClaimStatus.PENDING_FINANCE_APPROVAL, ClaimStatus.INFO_REQUESTED, ClaimStatus.APPROVED, ClaimStatus.CANCELLED]) {
       expect(isEditableStatus(s)).toBe(false);
     }
   });
 
-  it('assertEditable throws CLAIM_NOT_EDITABLE for a submitted claim', () => {
-    expect(() => assertEditable({ status: ClaimStatus.PENDING_APPROVAL })).toThrow(ApiError);
-    try {
-      assertEditable({ status: ClaimStatus.PENDING_APPROVAL });
-    } catch (e) {
-      expect((e as ApiError).code).toBe(ErrorCode.CLAIM_NOT_EDITABLE);
+  it('assertEditable throws CLAIM_NOT_EDITABLE once the approver has acted', () => {
+    for (const status of [ClaimStatus.PENDING_FINANCE_APPROVAL, ClaimStatus.INFO_REQUESTED, ClaimStatus.APPROVED]) {
+      expect(() => assertEditable({ status })).toThrow(ApiError);
+      try {
+        assertEditable({ status });
+      } catch (e) {
+        expect((e as ApiError).code).toBe(ErrorCode.CLAIM_NOT_EDITABLE);
+      }
     }
+    expect(() => assertEditable({ status: ClaimStatus.PENDING_APPROVAL })).not.toThrow();
   });
 
   it('a claim is cancellable in DRAFT, or PENDING_APPROVAL before a decision', () => {

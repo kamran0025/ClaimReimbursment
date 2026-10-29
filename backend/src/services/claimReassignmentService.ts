@@ -15,7 +15,7 @@ import { ApiError, ErrorCode } from './errors';
 import { assertReassignable } from './claimStateMachine';
 import { recordAudit } from './auditLogService';
 import { startReviewClock } from './approvalReminderService';
-import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
+import { buildClaimDetail, findClaimForUpdate, loadClaimForMutation } from './claimQueryService';
 import type { ScopeUser } from './claimScope';
 import type { BulkReassignClaimsInput, ReassignClaimInput } from '../validation/claimValidation';
 
@@ -75,7 +75,7 @@ async function reassignOne(
 /** POST /claims/:id/reassign */
 export async function reassignClaim(user: ScopeUser, claimId: string, input: ReassignClaimInput) {
   await prisma.$transaction(async (tx) => {
-    const claim = await tx.claim.findUnique({ where: { id: claimId } });
+    const claim = await findClaimForUpdate(tx, claimId);
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertReassignable(claim, user);
     await assertActiveApproverTarget(tx, input.toApproverId);

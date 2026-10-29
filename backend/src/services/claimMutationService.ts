@@ -22,15 +22,16 @@ import {
   requiresFinanceApproval,
 } from './claimStateMachine';
 import { recalculateClaimTotal } from './claimTotalService';
+import { isOverLimit, requireItemCategory } from './expenseCategoryService';
 import { recordAudit } from './auditLogService';
 import { resolveApprover } from './approverAssignmentService';
 import { startReviewClock } from './approvalReminderService';
-import { buildClaimDetail, loadClaimForMutation } from './claimQueryService';
+import { buildClaimDetail, findClaimForUpdate, loadClaimForMutation } from './claimQueryService';
 import { storage } from './storage';
 import type { CreateClaimInput, UpdateClaimInput, ClaimItemInput, RespondInfoInput } from '../validation/claimValidation';
 
 async function requireClaimForOwner(tx: Prisma.TransactionClient, user: ScopeUser, claimId: string): Promise<Claim> {
-  const claim = await tx.claim.findUnique({ where: { id: claimId } });
+  const claim = await findClaimForUpdate(tx, claimId);
   if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
   assertOwner(user, claim); // 
   return claim;
@@ -84,9 +85,6 @@ function validateItemInput(input: ClaimItemInput): void {
   if (parsed > Date.now() + 24 * 60 * 60 * 1000) {
     throw new ApiError(ErrorCode.VALIDATION_ERROR, 'Expense date cannot be in the future.', { field: 'expenseDate' });
   }
-  if (!input.category.trim()) {
-    throw new ApiError(ErrorCode.VALIDATION_ERROR, 'Category is required.', { field: 'category' });
-  }
   if (!input.description.trim()) {
     throw new ApiError(ErrorCode.VALIDATION_ERROR, 'Description is required.', { field: 'description' });
   }
@@ -100,11 +98,13 @@ export async function addItem(user: ScopeUser, claimId: string, input: ClaimItem
   await prisma.$transaction(async (tx) => {
     const claim = await requireClaimForOwner(tx, user, claimId);
     assertEditable(claim);
+    const category = await requireItemCategory(tx, input.categoryId);
     const item = await tx.claimItem.create({
       data: {
         claimId,
         expenseDate: new Date(input.expenseDate),
-        category: input.category.trim(),
+        categoryId: input.categoryId,
+        categoryLimit: category.maxAmount,
         description: input.description.trim(),
         amount: input.amount,
         merchant: input.merchant?.trim() || null,
@@ -117,7 +117,7 @@ export async function addItem(user: ScopeUser, claimId: string, input: ClaimItem
       action: 'ITEM_ADDED',
       oldStatus: claim.status,
       newStatus: claim.status,
-      metadata: { itemId: item.id, amount: input.amount },
+      metadata: { itemId: item.id, amount: input.amount, overLimit: isOverLimit(input.amount, category.maxAmount) },
     });
   });
   return buildClaimDetail(await loadClaimForMutation(claimId));
@@ -130,11 +130,13 @@ export async function updateItem(user: ScopeUser, claimId: string, itemId: strin
     assertEditable(claim);
     const existing = await tx.claimItem.findFirst({ where: { id: itemId, claimId } });
     if (!existing) throw new ApiError(ErrorCode.ITEM_NOT_FOUND, 'Line item not found.');
+    const category = await requireItemCategory(tx, input.categoryId);
     await tx.claimItem.update({
       where: { id: itemId },
       data: {
         expenseDate: new Date(input.expenseDate),
-        category: input.category.trim(),
+        categoryId: input.categoryId,
+        categoryLimit: category.maxAmount,
         description: input.description.trim(),
         amount: input.amount,
         merchant: input.merchant?.trim() || null,
@@ -147,7 +149,7 @@ export async function updateItem(user: ScopeUser, claimId: string, itemId: strin
       action: 'ITEM_UPDATED',
       oldStatus: claim.status,
       newStatus: claim.status,
-      metadata: { itemId },
+      metadata: { itemId, overLimit: isOverLimit(input.amount, category.maxAmount) },
     });
   });
   return buildClaimDetail(await loadClaimForMutation(claimId));
@@ -159,6 +161,10 @@ export async function deleteItem(user: ScopeUser, claimId: string, itemId: strin
     assertEditable(claim);
     const existing = await tx.claimItem.findFirst({ where: { id: itemId, claimId } });
     if (!existing) throw new ApiError(ErrorCode.ITEM_NOT_FOUND, 'Line item not found.');
+    // A claim in the approver's queue must keep something to review.
+    if (claim.status === ClaimStatus.PENDING_APPROVAL && (await tx.claimItem.count({ where: { claimId } })) === 1) {
+      throw new ApiError(ErrorCode.CLAIM_EMPTY_ITEMS, 'A submitted claim must keep at least one line item.');
+    }
 
     // Any receipt attached to this item goes with it.
     const attachedReceipts = await tx.receipt.findMany({ where: { claimId, claimItemId: itemId } });
@@ -257,9 +263,9 @@ export async function cancelClaim(user: ScopeUser, claimId: string) {
 // Decisions — approve / reject / request-info (assigned approver OR Finance),
 // and respond-info (claimant only). Whoever decides first wins: the claim
 // leaves PENDING_APPROVAL/INFO_REQUESTED inside the same transaction that
-// reads it, so a concurrent second decision on the same claim simply fails
-// `assertDecidable` against the now-decided status once its transaction reads
-// the row (normal transaction isolation on the row update — plan-backend.md §5).
+// reads it under the claim's row lock (`findClaimForUpdate`), so a concurrent
+// second decision — or a claimant edit to a PENDING_APPROVAL claim — waits,
+// then fails its guard against the now-decided status (plan-backend.md §5).
 //
 // Approval hierarchy: when the assigned approver approves a claim whose total
 // is above env.financeApprovalThreshold, the claim is escalated to
@@ -268,7 +274,7 @@ export async function cancelClaim(user: ScopeUser, claimId: string) {
 // ---------------------------------------------------------------------------
 export async function approveClaim(user: { id: string; role: Role }, claimId: string) {
   await prisma.$transaction(async (tx) => {
-    const claim = await tx.claim.findUnique({ where: { id: claimId } });
+    const claim = await findClaimForUpdate(tx, claimId);
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertDecidable(claim, user);
 
@@ -318,7 +324,7 @@ export async function rejectClaim(user: { id: string; role: Role }, claimId: str
     throw new ApiError(ErrorCode.REJECTION_REASON_REQUIRED, 'A rejection reason is required.', { field: 'reason' });
   }
   await prisma.$transaction(async (tx) => {
-    const claim = await tx.claim.findUnique({ where: { id: claimId } });
+    const claim = await findClaimForUpdate(tx, claimId);
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertDecidable(claim, user);
 
@@ -351,7 +357,7 @@ export async function requestInfo(user: { id: string; role: Role }, claimId: str
     throw new ApiError(ErrorCode.INFO_REQUEST_MESSAGE_REQUIRED, 'A message is required to request more information.', { field: 'message' });
   }
   await prisma.$transaction(async (tx) => {
-    const claim = await tx.claim.findUnique({ where: { id: claimId } });
+    const claim = await findClaimForUpdate(tx, claimId);
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertDecidable(claim, user);
 
@@ -376,7 +382,7 @@ export async function respondToInfoRequest(user: ScopeUser, claimId: string, inp
     throw new ApiError(ErrorCode.INFO_RESPONSE_MESSAGE_REQUIRED, 'A response message is required.', { field: 'message' });
   }
   await prisma.$transaction(async (tx) => {
-    const claim = await tx.claim.findUnique({ where: { id: claimId } });
+    const claim = await findClaimForUpdate(tx, claimId);
     if (!claim) throw new ApiError(ErrorCode.CLAIM_NOT_FOUND, 'Claim not found.');
     assertRespondable(claim, user);
 

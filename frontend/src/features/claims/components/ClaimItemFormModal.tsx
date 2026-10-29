@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -7,12 +7,11 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/common/ErrorState';
 import { ReceiptUploadButton } from '@/features/claims/components/ReceiptUploadButton';
+import { useCategories } from '@/features/categories/hooks/useCategories';
 import { claimItemSchema } from '@/features/claims/schemas';
 import type { ClaimItemFormValues, ClaimItemFormInput } from '@/features/claims/schemas';
 import type { ClaimItem } from '@/types/models';
-import { formatFileSize } from '@/utils/format';
-
-const CATEGORIES = ['Travel', 'Lodging', 'Meals', 'Training', 'Supplies', 'Software', 'Client Entertainment', 'Other'];
+import { formatFileSize, formatInr } from '@/utils/format';
 
 interface ClaimItemFormModalProps {
   isOpen: boolean;
@@ -28,13 +27,27 @@ export function ClaimItemFormModal({ isOpen, onClose, onSubmit, initialItem, isS
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<ClaimItemFormInput, unknown, ClaimItemFormValues>({
     resolver: zodResolver(claimItemSchema),
-    defaultValues: { expenseDate: '', category: '', description: '', amount: 0, merchant: '' },
+    defaultValues: { expenseDate: '', categoryId: '', description: '', amount: 0, merchant: '' },
   });
 
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const categories = useCategories();
+  // The item's own category must be an option before the list loads, so `reset` can select it.
+  const categoryOptions: { id: string; name: string }[] = (categories.data ?? []).map((c) => ({ id: c.id, name: c.name }));
+  if (initialItem && !categoryOptions.some((c) => c.id === initialItem.categoryId)) {
+    categoryOptions.push({ id: initialItem.categoryId, name: initialItem.category });
+  }
+
+  // Mirrors the backend's check so the claimant knows before saving; the item still saves when over.
+  const [watchedCategoryId, watchedAmount] = useWatch({ control, name: ['categoryId', 'amount'] });
+  const selectedCategory = categories.data?.find((c) => c.id === watchedCategoryId);
+  const limit = selectedCategory?.maxAmount ?? null;
+  const enteredAmount = Number(watchedAmount);
+  const isOverLimit = limit != null && enteredAmount > limit;
 
   useEffect(() => {
     if (isOpen) {
@@ -42,12 +55,12 @@ export function ClaimItemFormModal({ isOpen, onClose, onSubmit, initialItem, isS
         initialItem
           ? {
               expenseDate: initialItem.expenseDate.slice(0, 10),
-              category: initialItem.category,
+              categoryId: initialItem.categoryId,
               description: initialItem.description,
               amount: initialItem.amount,
               merchant: initialItem.merchant ?? '',
             }
-          : { expenseDate: new Date().toISOString().slice(0, 10), category: '', description: '', amount: 0, merchant: '' },
+          : { expenseDate: new Date().toISOString().slice(0, 10), categoryId: '', description: '', amount: 0, merchant: '' },
       );
       setReceiptFile(null);
     }
@@ -64,10 +77,15 @@ export function ClaimItemFormModal({ isOpen, onClose, onSubmit, initialItem, isS
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Expense date" type="date" error={errors.expenseDate?.message} {...register('expenseDate')} />
-          <Select label="Category" placeholder="Select a category" error={errors.category?.message} {...register('category')}>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
+          <Select
+            label="Category"
+            placeholder={categories.isLoading ? 'Loading categories…' : 'Select a category'}
+            error={errors.categoryId?.message ?? (categories.isError ? 'Could not load categories' : undefined)}
+            {...register('categoryId')}
+          >
+            {categoryOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </Select>
@@ -77,6 +95,17 @@ export function ClaimItemFormModal({ isOpen, onClose, onSubmit, initialItem, isS
           <Input label="Amount (INR)" type="number" step="0.01" min="0" error={errors.amount?.message} {...register('amount')} />
           <Input label="Merchant (optional)" placeholder="e.g. IndiGo" {...register('merchant')} />
         </div>
+        {selectedCategory && limit != null && !isOverLimit && (
+          <p className="-mt-2 text-xs text-slate-500">
+            Limit for {selectedCategory.name}: {formatInr(limit)} per item.
+          </p>
+        )}
+        {selectedCategory && isOverLimit && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            This amount is above the {formatInr(limit)} limit for {selectedCategory.name}. You can still save it, but it will be
+            flagged for your approver — use the description to explain why.
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <span className="text-sm font-medium text-slate-700">Receipt (optional)</span>
           <div className="flex items-center gap-2">

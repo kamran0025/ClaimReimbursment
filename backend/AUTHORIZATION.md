@@ -37,6 +37,7 @@ the service layer:
 | `GET /audit` (global) | `FINANCE` |
 | `GET /finance/export` | `FINANCE` |
 | `GET /users/employees` | `FINANCE` |
+| `POST /categories`, `PATCH` \| `DELETE /categories/:id` | `FINANCE` (`GET /categories` is open to any role) |
 | `GET /dashboards/claimant` \| `approver` \| `finance` | matching role only |
 
 Everything else (create claim, items, receipts upload, submit/cancel,
@@ -50,7 +51,7 @@ is gated to `CLAIMANT` — see below).
 
 | Action | Claimant | Approver | Finance |
 |---|---|---|---|
-| Create / edit own DRAFT or REJECTED claim | ✅ own only | ❌ | ❌ |
+| Create / edit own DRAFT, REJECTED or PENDING_APPROVAL claim | ✅ own only | ❌ | ❌ |
 | View claim | ✅ own only | ✅ only if `assignedApproverId === self` | ✅ any non-DRAFT |
 | Submit / resubmit (choose approver) | ✅ own only | ❌ | ❌ |
 | Approve / Reject / Request info | ❌ | ✅ only if assigned to self **and** status is `PENDING_APPROVAL`/`INFO_REQUESTED`, and the claim has not been escalated to Finance (`FINANCE_APPROVAL_REQUIRED` otherwise) | ✅ any claim in review (incl. `PENDING_FINANCE_APPROVAL`), regardless of assignment — the only role that can make the final decision on a claim above `FINANCE_APPROVAL_THRESHOLD` |
@@ -88,7 +89,7 @@ assigned to an approver" case.
 See `services/errors.ts` (`STATUS_BY_CODE`) for the authoritative mapping.
 Authorization-relevant ones: `UNAUTHENTICATED` → 401, `FORBIDDEN_ROLE` /
 `CLAIM_NOT_OWNED` / `CLAIM_NOT_ASSIGNED` → 403, `CLAIM_NOT_FOUND` /
-`ITEM_NOT_FOUND` / `RECEIPT_NOT_FOUND` → 404, everything state-machine
+`ITEM_NOT_FOUND` / `RECEIPT_NOT_FOUND` / `CATEGORY_NOT_FOUND` → 404, `CATEGORY_NAME_TAKEN` / `CATEGORY_IN_USE` → 409, everything state-machine
 related (`CLAIM_NOT_EDITABLE`, `CLAIM_NOT_PENDING_APPROVAL`,
 `CLAIM_NOT_CANCELLABLE`, `CLAIM_NOT_REASSIGNABLE`, `CLAIM_INVALID_TRANSITION`, `CLAIM_EMPTY_ITEMS`,
 `CLAIM_TOTAL_MISMATCH`) → 409.

@@ -92,6 +92,14 @@ dashboard-managed template) when all `EMAILJS_*` vars are set, otherwise
 
 ## Deviations from `plan-backend.md`
 
+- **Claimants can edit a `PENDING_APPROVAL` claim.** The plan locked claims
+  from submission until rejection. Now the claimant may correct a submitted
+  claim in place until the approver acts (`isEditableStatus`); it stays in
+  the approver's queue. Claimant edits and all decisions read the claim via
+  `findClaimForUpdate` (`SELECT ... FOR UPDATE`), so an approval and an edit
+  are serialized and the Finance-threshold check always sees the final total.
+  A pending claim can't lose its last item. Finance stage, `INFO_REQUESTED`
+  and terminal statuses stay locked.
 - **Reimbursement dropped entirely.** The frontend this backend serves
   never implements the `REIMBURSEMENT_PENDING`/`REIMBURSED` statuses or a
   `/reimbursements` resource — `APPROVED` is its terminal claim status. Per

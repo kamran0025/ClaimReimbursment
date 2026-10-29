@@ -5,16 +5,23 @@
 import { ClaimStatus, Role, type Claim, type Prisma } from '@prisma/client';
 import { ApiError, ErrorCode } from './errors';
 
-/** Claimant may edit title/items only while the claim is in one of these states. */
+/**
+ * Claimant may edit title/items/receipts only while the claim is in one of
+ * these states. PENDING_APPROVAL is included: until the approver acts, the
+ * claimant may still correct it in place (no resubmit needed). Edits and
+ * decisions lock the claim row (`findClaimForUpdate`), so an approver never
+ * decides on a total that changes mid-decision. Once the approver has acted
+ * (approved → Finance stage, rejected, info requested) the usual rules apply.
+ */
 export function isEditableStatus(status: ClaimStatus): boolean {
-  return status === ClaimStatus.DRAFT || status === ClaimStatus.REJECTED;
+  return status === ClaimStatus.DRAFT || status === ClaimStatus.REJECTED || status === ClaimStatus.PENDING_APPROVAL;
 }
 
 export function assertEditable(claim: Pick<Claim, 'status'>): void {
   if (!isEditableStatus(claim.status)) {
     throw new ApiError(
       ErrorCode.CLAIM_NOT_EDITABLE,
-      `Claim cannot be edited while in status ${claim.status}. Only DRAFT or REJECTED claims are editable.`,
+      `Claim cannot be edited while in status ${claim.status}. Only DRAFT, REJECTED or PENDING_APPROVAL claims are editable.`,
     );
   }
 }

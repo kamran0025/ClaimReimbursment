@@ -11,7 +11,7 @@ export const claimItemSchema = z.object({
     .min(1, 'Expense date is required')
     .refine((v) => !Number.isNaN(Date.parse(v)), 'Enter a valid date')
     .refine((v) => new Date(v).getTime() <= Date.now() + 24 * 60 * 60 * 1000, 'Date cannot be in the future'),
-  category: z.string().trim().min(1, 'Category is required'),
+  categoryId: z.string().min(1, 'Category is required'),
   description: z.string().trim().min(1, 'Description is required').max(300, 'Description is too long'),
   amount: z.coerce.number({ error: 'Amount is required' }).positive('Amount must be greater than zero'),
   merchant: z.string().trim().optional(),
@@ -19,6 +19,13 @@ export const claimItemSchema = z.object({
 export type ClaimItemFormValues = z.infer<typeof claimItemSchema>;
 /** Pre-coercion shape RHF's `register`/`defaultValues` actually work with (amount arrives as a string from the input). */
 export type ClaimItemFormInput = z.input<typeof claimItemSchema>;
+
+export const categorySchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(60, 'Name is too long'),
+  maxAmount: z.coerce.number({ error: 'Amount is required' }).positive('Amount must be greater than zero'),
+});
+export type CategoryFormValues = z.infer<typeof categorySchema>;
+export type CategoryFormInput = z.input<typeof categorySchema>;
 
 export const rejectReasonSchema = z.object({
   reason: z.string().trim().min(5, 'Please provide a reason of at least 5 characters'),

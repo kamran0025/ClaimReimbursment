@@ -9,7 +9,8 @@ so far: `prisma/migrations/20260921064744_init`.
 |---|---|
 | `User` | All three roles (`FINANCE`, `APPROVER`, `CLAIMANT`) in one table, distinguished by `role`. `isActive` soft-disables a login without deleting history. |
 | `Claim` | One row per claim. `total` is derived/cached (§ below) — never client-writable. `assignedApproverId` is null until first submit. `decidedById`/`decidedAt` record whoever (the assigned approver, or any Finance user) resolved the current submission cycle. `submissionCycle` increments on each resubmit; nothing is deleted on rejection/resubmit, so cycle history stays queryable via `AuditLog`. `assignedAt` is when the claim last landed in its current reviewer's queue (submit/resubmit, reassignment, escalation to Finance, or the claimant answering an info request); `lastRemindedAt`/`reminderCount` are the approval-reminder job's bookkeeping and reset with it. All three are server-owned and not serialized. |
-| `ClaimItem` | Line items. `amount` is `Decimal(10,2)` — never a float — to avoid rounding drift across repeated add/edit/delete cycles. |
+| `ExpenseCategory` | Finance-managed line-item categories. `name` is unique (case-insensitively, enforced in `expenseCategoryService`). `maxAmount` is the category's per-item INR limit (`Decimal(10,2)`, nullable only for categories that predate limits). Deletable only while no `ClaimItem` uses it. |
+| `ClaimItem` | Line items. `amount` is `Decimal(10,2)` — never a float — to avoid rounding drift across repeated add/edit/delete cycles. `categoryId` references `ExpenseCategory` (`ON DELETE RESTRICT`); the `20261029100000_expense_categories` migration replaced the old free-text `category` column, creating a category for each distinct existing value. `categoryLimit` snapshots the category's `maxAmount` (on item save, and on limit changes while the claim is `DRAFT`/`REJECTED`) so over-limit flags on claims in review stay fixed; `amount > categoryLimit` is the over-limit flag (computed in the serializer, not stored). |
 | `Receipt` | One row per uploaded file. `storagePath` is an opaque key into the `Storage` abstraction (a random filename on local disk today), never the client-supplied filename. `claimItemId` is nullable — a receipt can be tied to a specific line item or stand alone (e.g. an info-request attachment). |
 | `ClaimMessage` | The info-request/response thread. `type` distinguishes an approver/Finance question (`INFO_REQUEST`) from a claimant reply (`RESPONSE`), plus `APPROVER_CHANGED` — a system notice with `senderId` null, written when a claim is reassigned. `attachedReceiptId` optionally points at a `Receipt` uploaded alongside a response. |
 | `AuditLog` | Append-only. One row per state-changing action, written inside the same transaction as the change (`oldStatus`/`newStatus` captured explicitly rather than diffed after the fact). `metadata` is a free-form JSON bag for action-specific detail (e.g. `{reason}` on a rejection). |
@@ -47,9 +48,9 @@ write path:
 ## Indexes
 
 `Claim.claimantId`, `Claim.status`, `Claim.assignedApproverId`,
-`Claim.createdAt`, `Claim(status, assignedAt)` (reminder scan), `ClaimItem.claimId`, `Receipt.claimId`,
+`Claim.createdAt`, `Claim(status, assignedAt)` (reminder scan), `ClaimItem.claimId`, `ClaimItem.categoryId`, `Receipt.claimId`,
 `Receipt.claimItemId`, `ClaimMessage.claimId`, `AuditLog.claimId`,
-`User.role`. Unique: `User.email`.
+`User.role`. Unique: `User.email`, `ExpenseCategory.name`.
 
 ## Cascade behavior
 

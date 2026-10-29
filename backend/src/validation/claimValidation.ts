@@ -16,7 +16,7 @@ export type UpdateClaimInput = z.infer<typeof updateClaimSchema>;
 
 export const claimItemSchema = z.object({
   expenseDate: z.string().min(1, 'Expense date is required'),
-  category: z.string().trim().min(1, 'Category is required'),
+  categoryId: z.string().trim().min(1, 'Category is required'),
   description: z.string().trim().min(1, 'Description is required').max(300, 'Description is too long'),
   amount: z.coerce.number({ invalid_type_error: 'Amount is required', required_error: 'Amount is required' }),
   merchant: z.string().trim().optional(),

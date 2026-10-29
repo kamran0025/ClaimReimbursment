@@ -50,6 +50,25 @@ async function main() {
     });
   }
 
+  // The expense_categories migration inserts the default categories; upsert
+  // keeps the seed working even if it's run against a DB without them.
+  // Demo limits (INR) chosen so a few seeded items come out over the limit.
+  const categoryLimits: Record<string, number> = {
+    Travel: 15000,
+    Lodging: 5000,
+    Meals: 2000,
+    Training: 10000,
+    Supplies: 2000,
+    Software: 5000,
+    'Client Entertainment': 5000,
+    Other: 2000,
+  };
+  const categoryId: Record<string, string> = {};
+  for (const [name, maxAmount] of Object.entries(categoryLimits)) {
+    const category = await prisma.expenseCategory.upsert({ where: { name }, update: { maxAmount }, create: { name, maxAmount } });
+    categoryId[name] = category.id;
+  }
+
   // The guard above means we only ever reach this on a fresh database, but
   // delete-before-create keeps this safe if it's ever invoked manually too.
   await prisma.auditLog.deleteMany();
@@ -75,10 +94,10 @@ async function main() {
     });
     const items = await Promise.all([
       prisma.claimItem.create({
-        data: { claimId: claim.id, expenseDate: daysAgo(3), category: 'Travel', description: 'Cab to client office', amount: 850, merchant: 'Ola', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+        data: { claimId: claim.id, expenseDate: daysAgo(3), categoryId: categoryId['Travel'], description: 'Cab to client office', amount: 850, merchant: 'Ola', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
       }),
       prisma.claimItem.create({
-        data: { claimId: claim.id, expenseDate: daysAgo(3), category: 'Meals', description: 'Lunch with client', amount: 620, merchant: 'Barbeque Nation', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
+        data: { claimId: claim.id, expenseDate: daysAgo(3), categoryId: categoryId['Meals'], description: 'Lunch with client', amount: 620, merchant: 'Barbeque Nation', createdAt: daysAgo(2), updatedAt: daysAgo(2) },
       }),
     ]);
     const total = items.reduce((s, i) => s + Number(i.amount), 0);
@@ -107,8 +126,8 @@ async function main() {
       },
     });
     const items = await Promise.all([
-      prisma.claimItem.create({ data: { claimId: claim.id, expenseDate: daysAgo(5), category: 'Accommodation', description: 'Hotel, 2 nights', amount: 6400, merchant: 'Taj Vivanta', createdAt: daysAgo(4), updatedAt: daysAgo(4) } }),
-      prisma.claimItem.create({ data: { claimId: claim.id, expenseDate: daysAgo(4), category: 'Travel', description: 'Flight tickets', amount: 9800, merchant: 'IndiGo', createdAt: daysAgo(4), updatedAt: daysAgo(4) } }),
+      prisma.claimItem.create({ data: { claimId: claim.id, expenseDate: daysAgo(5), categoryId: categoryId['Lodging'], description: 'Hotel, 2 nights', amount: 6400, merchant: 'Taj Vivanta', createdAt: daysAgo(4), updatedAt: daysAgo(4) } }),
+      prisma.claimItem.create({ data: { claimId: claim.id, expenseDate: daysAgo(4), categoryId: categoryId['Travel'], description: 'Flight tickets', amount: 9800, merchant: 'IndiGo', createdAt: daysAgo(4), updatedAt: daysAgo(4) } }),
     ]);
     const total = items.reduce((s, i) => s + Number(i.amount), 0);
     await prisma.claim.update({ where: { id: claim.id }, data: { total } });
@@ -137,7 +156,7 @@ async function main() {
       },
     });
     const item = await prisma.claimItem.create({
-      data: { claimId: claim.id, expenseDate: daysAgo(7), category: 'Software', description: 'Annual IDE license', amount: 4200, merchant: 'JetBrains', createdAt: daysAgo(6), updatedAt: daysAgo(6) },
+      data: { claimId: claim.id, expenseDate: daysAgo(7), categoryId: categoryId['Software'], description: 'Annual IDE license', amount: 4200, merchant: 'JetBrains', createdAt: daysAgo(6), updatedAt: daysAgo(6) },
     });
     await prisma.claim.update({ where: { id: claim.id }, data: { total: item.amount } });
     await prisma.claimMessage.create({
@@ -174,7 +193,7 @@ async function main() {
       },
     });
     const item = await prisma.claimItem.create({
-      data: { claimId: claim.id, expenseDate: daysAgo(5), category: 'Meals', description: 'Dinner with client + guests', amount: 5400, merchant: 'The Table', createdAt: daysAgo(6), updatedAt: daysAgo(6) },
+      data: { claimId: claim.id, expenseDate: daysAgo(5), categoryId: categoryId['Meals'], description: 'Dinner with client + guests', amount: 5400, merchant: 'The Table', createdAt: daysAgo(6), updatedAt: daysAgo(6) },
     });
     await prisma.claim.update({ where: { id: claim.id }, data: { total: item.amount } });
     await prisma.auditLog.create({ data: { claimId: claim.id, actorId: 'u_employee3', action: AuditAction.CLAIM_CREATED, newStatus: ClaimStatus.DRAFT, createdAt: daysAgo(6) } });
@@ -205,7 +224,7 @@ async function main() {
       },
     });
     const item = await prisma.claimItem.create({
-      data: { claimId: claim.id, expenseDate: daysAgo(4), category: 'Office Supplies', description: 'Notebooks, pens, whiteboard markers', amount: 1250, merchant: 'Staples', createdAt: daysAgo(5), updatedAt: daysAgo(5) },
+      data: { claimId: claim.id, expenseDate: daysAgo(4), categoryId: categoryId['Supplies'], description: 'Notebooks, pens, whiteboard markers', amount: 1250, merchant: 'Staples', createdAt: daysAgo(5), updatedAt: daysAgo(5) },
     });
     await prisma.claim.update({ where: { id: claim.id }, data: { total: item.amount } });
     await prisma.auditLog.create({ data: { claimId: claim.id, actorId: 'u_employee2', action: AuditAction.CLAIM_CREATED, newStatus: ClaimStatus.DRAFT, createdAt: daysAgo(5) } });
@@ -256,7 +275,7 @@ async function main() {
       },
     });
     const item = await prisma.claimItem.create({
-      data: { claimId: claim.id, expenseDate: daysAgo(13), category: 'Travel', description: 'Team offsite travel + stay', amount: 18500, merchant: 'MakeMyTrip', createdAt: daysAgo(12), updatedAt: daysAgo(8) },
+      data: { claimId: claim.id, expenseDate: daysAgo(13), categoryId: categoryId['Travel'], description: 'Team offsite travel + stay', amount: 18500, merchant: 'MakeMyTrip', createdAt: daysAgo(12), updatedAt: daysAgo(8) },
     });
     await prisma.claim.update({ where: { id: claim.id }, data: { total: item.amount } });
     await prisma.auditLog.create({ data: { claimId: claim.id, actorId: 'u_employee3', action: AuditAction.CLAIM_CREATED, newStatus: ClaimStatus.DRAFT, createdAt: daysAgo(12) } });
@@ -264,6 +283,9 @@ async function main() {
     await prisma.auditLog.create({ data: { claimId: claim.id, actorId: 'u_approver1', action: AuditAction.CLAIM_REJECTED, oldStatus: ClaimStatus.PENDING_APPROVAL, newStatus: ClaimStatus.REJECTED, metadata: { reason: 'Need itemized hotel invoice, not a lump sum.' }, createdAt: daysAgo(8) } });
     await prisma.auditLog.create({ data: { claimId: claim.id, actorId: 'u_employee3', action: AuditAction.CLAIM_RESUBMITTED, oldStatus: ClaimStatus.REJECTED, newStatus: ClaimStatus.PENDING_APPROVAL, metadata: { submissionCycle: 2, assignedApproverId: 'u_approver2' }, createdAt: daysAgo(1) } });
   }
+
+  // Every item records the limit it was checked against (see ClaimItem.categoryLimit).
+  await prisma.$executeRaw`UPDATE "ClaimItem" ci SET "categoryLimit" = ec."maxAmount" FROM "ExpenseCategory" ec WHERE ec."id" = ci."categoryId"`;
 
   // eslint-disable-next-line no-console
   console.log('Seed complete: 7 users, 7 claims across every status.');

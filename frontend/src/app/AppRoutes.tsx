@@ -22,6 +22,7 @@ import { FinanceDashboardPage } from '@/pages/finance/DashboardPage';
 import { AllClaimsPage } from '@/pages/finance/AllClaimsPage';
 import { FinanceClaimDetailsPage } from '@/pages/finance/ClaimDetailsPage';
 import { EmployeesPage } from '@/pages/finance/EmployeesPage';
+import { CategoriesPage } from '@/pages/finance/CategoriesPage';
 import { AuditLogsPage } from '@/pages/finance/AuditLogsPage';
 import { ExportPage } from '@/pages/finance/ExportPage';
 
@@ -64,6 +65,7 @@ export function AppRoutes() {
           <Route path="/finance/claims" element={<AllClaimsPage />} />
           <Route path="/finance/claims/:claimId" element={<FinanceClaimDetailsPage />} />
           <Route path="/finance/employees" element={<EmployeesPage />} />
+          <Route path="/finance/categories" element={<CategoriesPage />} />
           <Route path="/finance/audit" element={<AuditLogsPage />} />
           <Route path="/finance/export" element={<ExportPage />} />
         </Route>

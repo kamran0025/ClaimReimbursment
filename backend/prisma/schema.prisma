@@ -125,21 +125,43 @@ model Claim {
   @@index([status, assignedAt])
 }
 
-model ClaimItem {
-  id          String   @id @default(cuid())
-  claimId     String
-  expenseDate DateTime
-  category    String
-  description String
-  amount      Decimal  @db.Decimal(10, 2)
-  merchant    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// Finance-managed list of expense categories. Can only be deleted while no
+// line item uses it (ClaimItem.categoryId is ON DELETE RESTRICT).
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  // Spending limit in INR. Null only for categories created before limits
+  // existed; required when Finance creates one. Items above it are saved but
+  // flagged (see ClaimItem.categoryLimit).
+  maxAmount Decimal? @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  claim    Claim     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  items ClaimItem[]
+}
+
+model ClaimItem {
+  id            String   @id @default(cuid())
+  claimId       String
+  expenseDate   DateTime
+  categoryId    String
+  // The category's maxAmount when this item was last checked: set on every
+  // item save, and refreshed when Finance changes the limit while the claim
+  // is still editable (DRAFT/REJECTED). Frozen once the claim is in review.
+  // Null = no limit. amount > categoryLimit flags the item for the approver.
+  categoryLimit Decimal? @db.Decimal(10, 2)
+  description   String
+  amount        Decimal  @db.Decimal(10, 2)
+  merchant      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  claim    Claim           @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   receipts Receipt[]
 
   @@index([claimId])
+  @@index([categoryId])
 }
 
 model Receipt {

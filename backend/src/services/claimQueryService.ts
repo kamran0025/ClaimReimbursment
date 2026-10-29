@@ -13,6 +13,17 @@ const claimRelationsInclude = {
   approverApprovedBy: true,
 } satisfies Prisma.ClaimInclude;
 
+/**
+ * Reads a claim inside `tx` while holding its row lock (SELECT ... FOR UPDATE)
+ * until the transaction ends. Every claimant edit and every decision goes
+ * through this, so an edit to a PENDING_APPROVAL claim and an approver's
+ * decision on it run one after the other — the second sees the first's result.
+ */
+export async function findClaimForUpdate(tx: Prisma.TransactionClient, claimId: string) {
+  await tx.$queryRaw`SELECT 1 FROM "Claim" WHERE "id" = ${claimId} FOR UPDATE`;
+  return tx.claim.findUnique({ where: { id: claimId } });
+}
+
 export interface ClaimFilters {
   status?: ClaimStatus | ClaimStatus[];
   claimantId?: string;
@@ -76,7 +87,7 @@ export async function getClaimDetail(user: ScopeUser, claimId: string) {
 /** Shared by every mutation's return value — always reload+reserialize post-mutation rather than hand-patching the in-memory object. */
 export async function buildClaimDetail(claim: Awaited<ReturnType<typeof loadClaimOrThrow>>) {
   const [items, receipts, messages] = await Promise.all([
-    prisma.claimItem.findMany({ where: { claimId: claim.id }, orderBy: { expenseDate: 'asc' } }),
+    prisma.claimItem.findMany({ where: { claimId: claim.id }, include: { category: { select: { name: true } } }, orderBy: { expenseDate: 'asc' } }),
     prisma.receipt.findMany({ where: { claimId: claim.id }, orderBy: { createdAt: 'asc' } }),
     prisma.claimMessage.findMany({
       where: { claimId: claim.id },

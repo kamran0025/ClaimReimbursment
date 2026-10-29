@@ -20,6 +20,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: 'Dashboard', to: '/finance/dashboard' },
     { label: 'All Claims', to: '/finance/claims' },
     { label: 'Employees', to: '/finance/employees' },
+    { label: 'Categories', to: '/finance/categories' },
     { label: 'Audit Logs', to: '/finance/audit' },
     { label: 'Export', to: '/finance/export' },
   ],

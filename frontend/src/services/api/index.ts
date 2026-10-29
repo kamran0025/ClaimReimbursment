@@ -15,4 +15,5 @@ export * as auditApi from './auditService';
 export * as usersApi from './usersService';
 export * as dashboardApi from './dashboardService';
 export * as financeApi from './financeService';
+export * as categoriesApi from './categoriesService';
 export { ApiError, ErrorCode, toErrorBody } from './errors';

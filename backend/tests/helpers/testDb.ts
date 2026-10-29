@@ -30,6 +30,7 @@ export async function resetTestDb(): Promise<void> {
   await testPrisma.claimMessage.deleteMany();
   await testPrisma.receipt.deleteMany();
   await testPrisma.claimItem.deleteMany();
+  await testPrisma.expenseCategory.deleteMany();
   await testPrisma.claim.deleteMany();
   await testPrisma.user.deleteMany();
 }
@@ -40,9 +41,11 @@ export interface SeededUsers {
   approverB: { id: string };
   claimantA: { id: string };
   claimantB: { id: string };
+  /** Line items need a category; seeded alongside the users so every test has them. */
+  categories: { travel: { id: string }; meals: { id: string }; lodging: { id: string } };
 }
 
-/** Minimal fixture set covering every role + "a second user of the same role" (for cross-tenant isolation tests). */
+/** Minimal fixture set covering every role + "a second user of the same role" (for cross-tenant isolation tests), plus a few categories. */
 export async function seedTestUsers(): Promise<SeededUsers> {
   const passwordHash = await bcrypt.hash('password123', 4);
   const [finance, approverA, approverB, claimantA, claimantB] = await Promise.all([
@@ -52,5 +55,8 @@ export async function seedTestUsers(): Promise<SeededUsers> {
     testPrisma.user.create({ data: { name: 'Claimant A', email: 'test-claimantA@example.com', role: 'CLAIMANT', passwordHash } }),
     testPrisma.user.create({ data: { name: 'Claimant B', email: 'test-claimantB@example.com', role: 'CLAIMANT', passwordHash } }),
   ]);
-  return { finance, approverA, approverB, claimantA, claimantB };
+  const [travel, meals, lodging] = await Promise.all(
+    ['Travel', 'Meals', 'Lodging'].map((name) => testPrisma.expenseCategory.create({ data: { name, maxAmount: 5000 } })),
+  );
+  return { finance, approverA, approverB, claimantA, claimantB, categories: { travel, meals, lodging } };
 }

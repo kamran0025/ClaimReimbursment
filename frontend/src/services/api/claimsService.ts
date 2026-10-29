@@ -82,7 +82,7 @@ export async function updateClaim(claimId: string, input: UpdateClaimInput): Pro
 
 export interface ClaimItemInput {
   expenseDate: string;
-  category: string;
+  categoryId: string;
   description: string;
   amount: number;
   merchant?: string;

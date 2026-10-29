@@ -38,7 +38,7 @@ async function submitClaim(claimantId: string, amount = 100, title = 'Reminder t
   const claimId = created.body.data.id as string;
   await claimant.post(`/claims/${claimId}/items`).send({
     expenseDate: new Date().toISOString().slice(0, 10),
-    category: 'Travel',
+    categoryId: users.categories.travel.id,
     description: 'Item',
     amount,
   });

@@ -2,6 +2,7 @@ import type { ClaimItem, Receipt } from '@/types/models';
 import { formatDate, formatInr } from '@/utils/format';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { ReceiptPreview } from './ReceiptPreview';
 import { ReceiptUploadButton } from './ReceiptUploadButton';
 
@@ -33,9 +34,16 @@ export function ClaimItemsTable({
   }
 
   const receiptsForItem = (itemId: string) => receipts.filter((r) => r.claimItemId === itemId);
+  const overLimitCount = items.filter((i) => i.isOverLimit).length;
 
   return (
     <div className="overflow-x-auto">
+      {overLimitCount > 0 && (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          {overLimitCount === 1 ? '1 item is' : `${overLimitCount} items are`} above the category limit. Check the description for
+          the reason before deciding.
+        </div>
+      )}
       <table className="w-full min-w-[720px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -57,7 +65,14 @@ export function ClaimItemsTable({
                 <td className="px-3 py-2.5 text-slate-600">{item.category}</td>
                 <td className="px-3 py-2.5 text-slate-800">{item.description}</td>
                 <td className="px-3 py-2.5 text-slate-500">{item.merchant || '—'}</td>
-                <td className="px-3 py-2.5 text-right font-medium text-slate-900">{formatInr(item.amount)}</td>
+                <td className="px-3 py-2.5 text-right align-top">
+                  <div className="font-medium text-slate-900">{formatInr(item.amount)}</div>
+                  {item.isOverLimit && item.categoryLimit != null && (
+                    <Badge color="amber" className="mt-1 whitespace-nowrap">
+                      Over {formatInr(item.categoryLimit)} limit
+                    </Badge>
+                  )}
+                </td>
                 <td className="px-3 py-2.5">
                   <div className="flex min-w-[160px] flex-col gap-1.5">
                     {itemReceipts.map((r) => (

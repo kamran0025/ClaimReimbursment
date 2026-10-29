@@ -3,7 +3,7 @@
 // to {id,name,email[,role]}).
 import { env } from '../lib/env';
 import { requiresFinanceApproval } from './claimStateMachine';
-import type { AuditLog, Claim, ClaimItem, ClaimMessage, Receipt, User } from '@prisma/client';
+import type { AuditLog, Claim, ClaimItem, ClaimMessage, ExpenseCategory, Receipt, User } from '@prisma/client';
 
 export type PickedUser = Pick<User, 'id' | 'name' | 'email'>;
 export type PickedUserWithRole = Pick<User, 'id' | 'name' | 'email' | 'role'>;
@@ -58,12 +58,27 @@ export function serializeClaim(claim: ClaimWithRelations) {
   };
 }
 
-export function serializeClaimItem(item: ClaimItem) {
+export function serializeExpenseCategory(category: ExpenseCategory) {
+  return {
+    id: category.id,
+    name: category.name,
+    maxAmount: category.maxAmount == null ? null : Number(category.maxAmount),
+    createdAt: category.createdAt.toISOString(),
+    updatedAt: category.updatedAt.toISOString(),
+  };
+}
+
+/** `category` is the category's current name, kept as a string so display code didn't change when categories moved to a table. */
+export function serializeClaimItem(item: ClaimItem & { category: Pick<ExpenseCategory, 'name'> }) {
   return {
     id: item.id,
     claimId: item.claimId,
     expenseDate: item.expenseDate.toISOString(),
-    category: item.category,
+    categoryId: item.categoryId,
+    category: item.category.name,
+    // Flagged for the approver; the item itself is accepted either way.
+    categoryLimit: item.categoryLimit == null ? null : Number(item.categoryLimit),
+    isOverLimit: item.categoryLimit != null && Number(item.amount) > Number(item.categoryLimit),
     description: item.description,
     amount: Number(item.amount),
     merchant: item.merchant ?? undefined,

@@ -66,6 +66,9 @@ export function EditClaimPage() {
 
   const editable = isEditableStatus(claim.status);
   const isResubmit = claim.status === 'REJECTED';
+  // Already with the approver: edits apply in place, there's nothing to (re)submit.
+  const isPending = claim.status === 'PENDING_APPROVAL';
+  const canSubmit = editable && !isPending;
 
   const onSaveTitle = async (values: ClaimTitleFormValues) => {
     try {
@@ -77,7 +80,7 @@ export function EditClaimPage() {
   };
 
   const handleItemSubmit = async (
-    values: { expenseDate: string; category: string; description: string; amount: number; merchant?: string },
+    values: { expenseDate: string; categoryId: string; description: string; amount: number; merchant?: string },
     receiptFile: File | null,
   ) => {
     try {
@@ -184,6 +187,13 @@ export function EditClaimPage() {
         </div>
       )}
 
+      {isPending && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          This claim is waiting for approval. You can still correct it until your approver acts on it — changes are saved
+          straight away and your approver sees the updated claim.
+        </div>
+      )}
+
       {claim.status === 'REJECTED' && claim.rejectionReason && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <strong>Rejected:</strong> {claim.rejectionReason}
@@ -233,7 +243,7 @@ export function EditClaimPage() {
         </CardBody>
       </Card>
 
-      {editable && (
+      {canSubmit && (
         <div className="flex flex-wrap justify-end gap-2">
           {claim.status === 'DRAFT' && (
             <Button variant="outline" className="text-red-600" onClick={() => setConfirmCancel(true)}>
@@ -248,7 +258,7 @@ export function EditClaimPage() {
           </Button>
         </div>
       )}
-      {editable && claim.items.length === 0 && (
+      {canSubmit && claim.items.length === 0 && (
         <p className="mt-2 text-right text-xs text-slate-400">Add at least one line item before submitting.</p>
       )}
 
