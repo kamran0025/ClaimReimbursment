@@ -1,5 +1,7 @@
 export interface EmailMessage {
   to: string;
+  /** Recipient's display name, e.g. "Arjun Mehta (Approver)". */
+  toName: string;
   subject: string;
   /** Heading shown at the top of the email. */
   title: string;

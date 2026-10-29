@@ -75,6 +75,8 @@ describe('approval reminders', () => {
     expect(await runApprovalReminders({ notifier, config })).toEqual({ claimsReminded: 2, emailsSent: 1, emailsFailed: 0 });
     expect(notifier.sent).toHaveLength(1);
     expect(notifier.sent[0].to).toBe(await emailOf(users.approverA.id));
+    expect(notifier.sent[0].toName).toBe('Approver A (Approver)');
+    expect(notifier.sent[0].html).toContain('Hi Approver A (Approver)');
     expect(notifier.sent[0].subject).toBe('Reminder: 2 expense claims awaiting your approval');
     expect(notifier.sent[0].text).toContain('Taxi');
     expect(notifier.sent[0].text).toContain('Hotel');
@@ -121,6 +123,7 @@ describe('approval reminders', () => {
     const notifier = fakeNotifier();
     expect(await runApprovalReminders({ notifier, config })).toEqual({ claimsReminded: 1, emailsSent: 2, emailsFailed: 0 });
     expect(notifier.sent.map((m) => m.to).sort()).toEqual([await emailOf(users.finance.id), financeB.email].sort());
+    expect(notifier.sent.map((m) => m.toName).sort()).toEqual(['Finance (Finance)', 'Finance B (Finance)']);
     expect(notifier.sent[0].text).toContain(`/finance/claims/${claimId}`);
   });
 

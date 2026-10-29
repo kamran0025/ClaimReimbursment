@@ -127,6 +127,7 @@ function escapeHtml(value: string): string {
 }
 
 export function buildReminderEmail(recipient: Recipient, claims: OverdueClaim[], now: Date): EmailMessage {
+  const toName = `${recipient.name} (${recipient.role === Role.FINANCE ? 'Finance' : 'Approver'})`;
   const queueUrl = `${env.appUrl}${recipient.role === Role.FINANCE ? '/finance/claims' : '/approver/claims'}`;
   const count = claims.length;
   const title = `${count} expense claim${count === 1 ? '' : 's'} awaiting your approval`;
@@ -139,7 +140,7 @@ export function buildReminderEmail(recipient: Recipient, claims: OverdueClaim[],
   });
 
   const text = [
-    `Hi ${recipient.name},`,
+    `Hi ${toName},`,
     '',
     intro,
     '',
@@ -149,7 +150,7 @@ export function buildReminderEmail(recipient: Recipient, claims: OverdueClaim[],
   ].join('\n');
 
   const html = [
-    `<p>Hi ${escapeHtml(recipient.name)},</p>`,
+    `<p>Hi ${escapeHtml(toName)},</p>`,
     `<p>${intro}</p>`,
     '<ul>',
     ...rows.map(
@@ -161,7 +162,7 @@ export function buildReminderEmail(recipient: Recipient, claims: OverdueClaim[],
     `<p>${outro}</p>`,
   ].join('');
 
-  return { to: recipient.email, subject: `Reminder: ${title}`, title, text, html, linkUrl: queueUrl };
+  return { to: recipient.email, toName, subject: `Reminder: ${title}`, title, text, html, linkUrl: queueUrl };
 }
 
 /** Marks the claims as reminded at `now`, skipping any whose state changed since they were read. */
